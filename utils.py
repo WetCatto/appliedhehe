@@ -46,18 +46,17 @@ def load_data():
         }
         
         # Check if files exist to avoid hard crashes
-        if not os.path.exists('flights.csv'):
+        if os.path.exists('flights.parquet'):
+            flights = pd.read_parquet('flights.parquet')
+        elif os.path.exists('flights.csv'):
+            flights = pd.read_csv('flights.csv', dtype=dtypes, low_memory=False)
+        else:
             return None, None, None
-
-        # Determine if we should load a subset for testing (optional logic, kept simple for now)
-        # Using iterator or nrows could be useful for dev, lets stick to full load but cached
-        flights = pd.read_csv('flights.csv', dtype=dtypes, low_memory=False)
 
         # Load reference data
         airlines = pd.read_csv('airlines.csv')
         airports = pd.read_csv('airports.csv')
-
-        # Merge for richer data
+        
         # Rename IATA_CODE to match flights for easier merging or lookups
         # Actually, let's keep them separate and merge on demand or just use lookups for performance
         # adding Airline Name to flights is usually helpful

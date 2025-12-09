@@ -813,7 +813,7 @@ with tab_airport:
                        color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_main = update_chart_layout(fig_main)
     fig_main = update_chart_layout(fig_main)
-    fig_main.update_layout(height=450, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
+    fig_main.update_layout(autoheight=450, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
     st.plotly_chart(fig_main, use_container_width=True)
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
