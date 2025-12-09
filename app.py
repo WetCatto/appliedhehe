@@ -102,7 +102,13 @@ selected_airline = 'All'
 selected_origin = 'All'
 
 # Apply Filters
+print("DEBUG: Pre-filter row count:", len(flights))
+print("DEBUG: Pre-filter DAY_OF_WEEK counts:\n", flights['DAY_OF_WEEK'].value_counts().sort_index())
+
 filtered_df = apply_filters(flights, selected_month, selected_airline, selected_origin)
+
+print("DEBUG: Post-filter row count:", len(filtered_df))
+print("DEBUG: Post-filter DAY_OF_WEEK counts:\n", filtered_df['DAY_OF_WEEK'].value_counts().sort_index())
 
 # --- Summary Metrics Calculations ---
 total_flights = len(filtered_df)
@@ -813,7 +819,7 @@ with tab_airport:
                        color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_main = update_chart_layout(fig_main)
 
-    fig_main.update_layout(height=450, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
+    fig_main.update_layout(height=450, autosize=True, width=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
     st.plotly_chart(fig_main, use_container_width=True)
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
@@ -876,10 +882,15 @@ with tab_eda:
         vol_day = filtered_df.groupby('DAY_OF_WEEK').size().reindex([1, 2, 3, 4, 5, 6, 7], fill_value=0).reset_index(name='Count')
         vol_day['Day Name'] = vol_day['DAY_OF_WEEK'].map(day_map)
         
-        fig_vol_d = px.bar(vol_day, x='Day Name', y='Count', title="Flight Volume by Day of Week", color='Count', color_continuous_scale='Blues')
+        fig_vol_d = px.bar(vol_day, x='Day Name', y='Count', title="Flight Volume by Day of Week")
+        fig_vol_d.update_traces(marker_color='#1d4ed8') # Strong blue
         fig_vol_d = update_chart_layout(fig_vol_d)
         fig_vol_d.update_layout(showlegend=False)
         st.plotly_chart(fig_vol_d, use_container_width=True)
+        
+        # Debug: Check why Sat/Sun might be missing
+        st.write("Debug: Day Counts in Filtered DF:")
+        st.write(filtered_df['DAY_OF_WEEK'].value_counts().sort_index())
 
     st.markdown("---")
 
