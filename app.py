@@ -6,8 +6,8 @@ from utils import load_data, apply_filters
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Airline Flight Delays Analysis",
-    page_icon="✈️",
+    page_title="Airline Flight Delays Dashboard",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -120,7 +120,7 @@ month_map_rev = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun',
 day_map = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
 
 # --- Main Dashboard Structure ---
-st.title("✈️ Airline Performance Dashboard")
+st.title("Airline Performance Dashboard")
 # --- Helper Functions ---
 
 # Helper to transparentize charts and apply Maven theme colors
