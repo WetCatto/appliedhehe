@@ -89,6 +89,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Data Loading ---
+# Force clear cache to ensure parquet is loaded correctly if stale
+st.cache_data.clear()
+
 with st.spinner('Loading Application Data...'):
     flights, airlines, airports = load_data()
 
@@ -141,7 +144,7 @@ def update_chart_layout(fig):
         xaxis=dict(showgrid=False, zeroline=False, color="#94a3b8", gridcolor='#1e293b'),
         yaxis=dict(showgrid=True, gridcolor="#1e293b", zeroline=False, color="#94a3b8"),
         margin=dict(l=10, r=10, t=40, b=10), # Reduced margins for max width
-        autosize=True, # Force autosize
+        autosize=True, # Re-enabled for autoscale
         # Animation Transition
         transition={'duration': 500, 'easing': 'cubic-in-out'}
     )
@@ -178,7 +181,7 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316"):
     return fig
 
 # Tabs Reorganization:# --- Layout Definitions ---
-tab_exec, tab_delay, tab_time, tab_airline, tab_airport, tab_eda = st.tabs(["Executive View", "Delay Analysis", "Time Analysis", "Airline Analysis", "Airport Analysis", "Deep Dive (EDA)"])
+tab_delay, tab_time, tab_airline, tab_airport, tab_eda = st.tabs(["Delay Analysis", "Time Analysis", "Airline Analysis", "Airport Analysis", "Deep Dive (EDA)"])
 
 
 # --- Custom CSS ---
@@ -403,82 +406,13 @@ def render_kpi_header(df):
 def get_status_counts(df, group_col):
     # Count total, on_time, delayed, cancelled
     # Select only necessary columns to avoid FutureWarning about grouping columns
-    agg = df.groupby(group_col)[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
+    agg = df.groupby(group_col, observed=False)[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
         'Total': len(x),
         'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
         'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
         'Cancelled': x['CANCELLED'].sum()
     })).reset_index()
     return agg
-
-
-# --- Tab: Executive View ---
-with tab_exec:
-    st.markdown("### Executive View")
-    
-    render_kpi_header(filtered_df)
-    
-    # --- Efficiency Metrics (Executive Specific) ---
-    st.markdown("#### Efficiency Metrics")
-    
-    # We need a helper for Gauge Charts (Local or Global? It's defined below in lines 433+. We should move it up or use it.)
-    # The definition of create_gauge is currently at line 433.
-    # I should move create_gauge to utils or top of app.py eventually. for now just make sure it's defined before use if I use it here.
-    # Actually, it's defined inside the block below. I will move it to the top of tab_exec or just keep it there if I use it after.
-    # The code below line 433 defines create_gauge.
-    
-    # Let's just remove the orphaned lines first.
-    
-    # Re-insert the Gauges Logic that was supposed to be there.
-    # Wait, the gauge logic I want is the "Efficiency Gauges" (Dist, Air, Delay).
-    # I will paste the Efficiency Gauges block I prepared earlier.
-    
-    # Helper for Gauge Charts (Global definition better, but let's define if not exists)
-    def create_gauge_exec(value, title, min_val, max_val, color):
-        fig = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = value,
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': title, 'font': {'size': 18, 'color': 'white', 'family': 'Inter'}},
-            gauge = {
-                'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar': {'color': color},
-                'bgcolor': "rgba(0,0,0,0)",
-                'borderwidth': 0,
-                'bordercolor': "rgba(0,0,0,0)",
-                'steps': [{'range': [min_val, max_val], 'color': 'rgba(255, 255, 255, 0.1)'}],
-            }
-        ))
-        fig.update_layout(paper_bgcolor = "rgba(0,0,0,0)", font = {'color': "white"}, height=200, margin=dict(l=30, r=30, t=50, b=20))
-        return fig
-
-    e1, e2, e3 = st.columns(3)
-    
-    # Metrics
-    tot_dist = filtered_df['DISTANCE'].sum()
-    avg_dist = filtered_df['DISTANCE'].mean()
-    tot_air = filtered_df['AIR_TIME'].sum()
-    avg_air = filtered_df['AIR_TIME'].mean()
-    # For Total Delay, let's use sum of Arrival Delays (positive only? or net?)
-    # Mockup says "Total Delay 62.65M" and "Average Delay 10.94"
-    # 10.94 corresponds to Average Arrival Delay probably.
-    avg_delay = filtered_df['ARRIVAL_DELAY'].mean()
-    tot_delay = filtered_df['ARRIVAL_DELAY'].sum() # Simple sum
-    
-    with e1:
-        st.markdown(f"<div style='text-align:center; font-weight:bold; font-size:18px;'>{fmt_num(tot_dist)}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align:center; font-size:12px; opacity:0.7;'>Total Distance</div>", unsafe_allow_html=True)
-        st.plotly_chart(create_gauge_exec(avg_dist, "Average Distance", 0, 2000, "#3b82f6"), use_container_width=True)
-        
-    with e2:
-        st.markdown(f"<div style='text-align:center; font-weight:bold; font-size:18px;'>{fmt_num(tot_air)}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align:center; font-size:12px; opacity:0.7;'>Total Air Time</div>", unsafe_allow_html=True)
-        st.plotly_chart(create_gauge_exec(avg_air, "Average Air Time", 0, 300, "#3b82f6"), use_container_width=True)
-        
-    with e3:
-        st.markdown(f"<div style='text-align:center; font-weight:bold; font-size:18px;'>{fmt_num(tot_delay)}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align:center; font-size:12px; opacity:0.7;'>Total Delay</div>", unsafe_allow_html=True)
-        st.plotly_chart(create_gauge_exec(avg_delay, "Average Delay", -20, 60, "#f97316"), use_container_width=True)
 
 # --- Tab: Delay Analysis ---
 with tab_delay:
@@ -560,14 +494,13 @@ with tab_delay:
     
     # Reverting to Area chart as requested ("stacked line graph like before"), with spline smoothing
     fig_c3 = px.area(avg_delay_airline_month, x='Month', y='ARRIVAL_DELAY', color='AIRLINE_NAME',
-                     title="Average Delay by Airline (Monthwise)",
                      labels={'ARRIVAL_DELAY': 'Average Delay'})
     fig_c3.update_traces(line_shape='spline')
     # Use 'stackgroup=None' to prevent values from summing up, allowing negative values to display correctly as absolute plots.
     # This keeps the "filled/stacked" look but is mathematically correct for mixed signs.
     fig_c3.update_traces(stackgroup=None, fill='tozeroy') 
     fig_c3 = update_chart_layout(fig_c3)
-    fig_c3.update_layout(height=450, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
+    fig_c3.update_layout(autosize=True, height=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
     st.plotly_chart(fig_c3, use_container_width=True)
 
 # --- Tab: Time Analysis ---
@@ -747,7 +680,7 @@ with tab_airline:
                                # title="Flight Analysis by Airline", 
                                color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_airline_stack = update_chart_layout(fig_airline_stack)
-    fig_airline_stack.update_layout(autosize=True, height=450, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
+    fig_airline_stack.update_layout(autosize=True, height=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
     st.plotly_chart(fig_airline_stack, use_container_width=True)
     
     st.markdown("---")
@@ -785,7 +718,7 @@ with tab_airport:
     
     # helper for airport aggregates
     def get_airport_counts(df):
-         agg = df.groupby('ORIGIN_AIRPORT')[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
+         agg = df.groupby('ORIGIN_AIRPORT', observed=False)[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
             'Total': len(x),
             'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
             'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
@@ -819,7 +752,7 @@ with tab_airport:
                        color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_main = update_chart_layout(fig_main)
 
-    fig_main.update_layout(height=450, autosize=True, width=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
+    fig_main.update_layout(height=None, autosize=True, width=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
     st.plotly_chart(fig_main, use_container_width=True)
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
@@ -888,10 +821,6 @@ with tab_eda:
         fig_vol_d.update_layout(showlegend=False)
         st.plotly_chart(fig_vol_d, use_container_width=True)
         
-        # Debug: Check why Sat/Sun might be missing
-        st.write("Debug: Day Counts in Filtered DF:")
-        st.write(filtered_df['DAY_OF_WEEK'].value_counts().sort_index())
-
     st.markdown("---")
 
     st.markdown("#### 2. Departure Delay Insights")
