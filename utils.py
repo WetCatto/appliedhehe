@@ -65,6 +65,14 @@ def load_data():
         airline_dict = pd.Series(airlines.AIRLINE.values, index=airlines.IATA_CODE).to_dict()
         flights['AIRLINE_NAME'] = flights['AIRLINE'].map(airline_dict)
 
+        # Optimize memory: Convert string columns to categorical
+        # This reduces memory usage significantly for columns with limited unique values
+        categorical_cols = ['AIRLINE', 'AIRLINE_NAME', 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT', 
+                           'TAIL_NUMBER', 'CANCELLATION_REASON']
+        for col in categorical_cols:
+            if col in flights.columns:
+                flights[col] = flights[col].astype('category')
+
         # Handle dates
         # Use pd.to_datetime with a dictionary to correctly handle types and avoid overflows
         flights['DATE'] = pd.to_datetime({
