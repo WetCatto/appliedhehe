@@ -159,6 +159,7 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316"):
         value = value,
         title = {'text': title, 'font': {'size': 18, 'color': 'white'}},
         number = {'font': {'size': 36, 'color': 'white'}},
+        domain = {'x': [0, 1], 'y': [0, 1]},
         gauge = {
             'axis': {'range': [None, max_val], 'tickwidth': 1, 'tickcolor': "white"},
             'bar': {'color': color, 'thickness': 0.75}, # Thicker bar
@@ -173,8 +174,8 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316"):
         }
     ))
     fig.update_layout(
-        height=220, # Increased height
-        margin={'t': 40, 'b': 20, 'l': 30, 'r': 30},
+        height=240, # Increased height for title space
+        margin={'t': 60, 'b': 20, 'l': 30, 'r': 30}, # Increased top margin
         paper_bgcolor='rgba(0,0,0,0)',
         font={'color': "white"}
     )
@@ -419,9 +420,7 @@ with tab_delay:
     st.markdown("### Delay Analysis")
     
     render_kpi_header(filtered_df)
-    
-    st.markdown("#### Delay Metrics & Operational Efficiency")
-    
+        
     # Calculate Delay Metrics
     avg_airline_delay = filtered_df['AIRLINE_DELAY'].mean()
     avg_aircraft_delay = filtered_df['LATE_AIRCRAFT_DELAY'].mean()
@@ -436,16 +435,14 @@ with tab_delay:
     # Helper is globally available: create_gauge_chart(value, title, max_val=None, color="#f97316")
     # Assuming standard orange color for delays
     
-    dg1.plotly_chart(create_gauge_chart(avg_airline_delay, "Avg Airline Delay", max_val=30, color="#f97316"), use_container_width=True)
-    dg2.plotly_chart(create_gauge_chart(avg_aircraft_delay, "Avg Aircraft Delay", max_val=30, color="#f97316"), use_container_width=True)
-    dg3.plotly_chart(create_gauge_chart(avg_system_delay, "Avg System Delay", max_val=30, color="#f97316"), use_container_width=True)
-    dg4.plotly_chart(create_gauge_chart(avg_weather_delay, "Avg Weather Delay", max_val=10, color="#f97316"), use_container_width=True)
-    dg5.plotly_chart(create_gauge_chart(avg_security_delay, "Avg Security Delay", max_val=5, color="#f97316"), use_container_width=True)
+    dg1.plotly_chart(create_gauge_chart(avg_airline_delay, "Average Airline Delay", max_val=30, color="#f97316"), use_container_width=True)
+    dg2.plotly_chart(create_gauge_chart(avg_aircraft_delay, "Average Aircraft Delay", max_val=30, color="#f97316"), use_container_width=True)
+    dg3.plotly_chart(create_gauge_chart(avg_system_delay, "Average System Delay", max_val=30, color="#f97316"), use_container_width=True)
+    dg4.plotly_chart(create_gauge_chart(avg_weather_delay, "Average Weather Delay", max_val=10, color="#f97316"), use_container_width=True)
+    dg5.plotly_chart(create_gauge_chart(avg_security_delay, "Average Security Delay", max_val=5, color="#f97316"), use_container_width=True)
     
     st.markdown("---")
-    
-    st.markdown("#### Trend Analysis")
-    
+        
     # Chart 1 & 2
     dc_c1, dc_c2 = st.columns(2)
     
@@ -470,8 +467,8 @@ with tab_delay:
                         title="Avg Airline & Aircraft Delay and Avg Air System Delay by Month",
                         color_discrete_map={'Avg Airline & Aircraft Delay': '#3b82f6', 'Avg Air System Delay': '#1e3a8a'})
         fig_c1 = update_chart_layout(fig_c1)
-        fig_c1.update_layout(legend_title="", height=400)
-        st.plotly_chart(fig_c1, use_container_width=True)
+        fig_c1.update_layout(autosize=True, legend_title="", height=None)
+        st.plotly_chart(fig_c1, use_container_width=True, config={"responsive": True})
         
     with dc_c2:
         # Chart 2: Avg Weather, Dep, Arr, Taxi Out Delay by Month (Stacked Bar)
@@ -482,26 +479,27 @@ with tab_delay:
                         color_discrete_map={'WEATHER_DELAY': '#ef4444', 'DEPARTURE_DELAY': '#db2777', 'ARRIVAL_DELAY': '#f97316', 'TAXI_OUT': '#eab308'}
                         )
         fig_c2 = update_chart_layout(fig_c2)
-        fig_c2.update_layout(legend_title="", height=400)
-        st.plotly_chart(fig_c2, use_container_width=True)
+        fig_c2.update_layout(autosize=True, legend_title="", height=None)
+        st.plotly_chart(fig_c2, use_container_width=True, config={"responsive": True})
         
     st.markdown("---")
     
     # Chart 3: Average Delay by Airline (Monthwise) - Multi-line Area
-    st.markdown("#### Average Delay by Airline (Monthwise)")
     avg_delay_airline_month = filtered_df.groupby(['MONTH', 'AIRLINE_NAME'])['ARRIVAL_DELAY'].mean().reset_index()
     avg_delay_airline_month['Month'] = avg_delay_airline_month['MONTH'].map(month_map_rev)
     
     # Reverting to Area chart as requested ("stacked line graph like before"), with spline smoothing
     fig_c3 = px.area(avg_delay_airline_month, x='Month', y='ARRIVAL_DELAY', color='AIRLINE_NAME',
-                     labels={'ARRIVAL_DELAY': 'Average Delay'})
+                    title="Average Delay by Airline (Monthwise)",
+                    labels={'ARRIVAL_DELAY': 'Average Delay'})
     fig_c3.update_traces(line_shape='spline')
     # Use 'stackgroup=None' to prevent values from summing up, allowing negative values to display correctly as absolute plots.
     # This keeps the "filled/stacked" look but is mathematically correct for mixed signs.
     fig_c3.update_traces(stackgroup=None, fill='tozeroy') 
     fig_c3 = update_chart_layout(fig_c3)
-    fig_c3.update_layout(autosize=True, height=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
-    st.plotly_chart(fig_c3, use_container_width=True)
+    fig_c3.update_layout(autosize=True, width=None, height=None, showlegend=True, legend=dict(orientation="h", y=-0.25, x=0.5, xanchor='center'), margin=dict(l=10, r=10, t=40, b=150))
+    with st.container():
+        st.plotly_chart(fig_c3, use_container_width=True, config={"responsive": True})
 
 # --- Tab: Time Analysis ---
 # --- Tab: Time Analysis ---
@@ -571,8 +569,8 @@ with tab_time:
                         color_discrete_map=colors_status)
         fig_m.update_traces(line_shape='spline')
         fig_m = update_chart_layout(fig_m)
-        fig_m.update_layout(height=400)
-        st.plotly_chart(fig_m, use_container_width=True)
+        fig_m.update_layout(autosize=True, height=None)
+        st.plotly_chart(fig_m, use_container_width=True, config={"responsive": True})
         
     with r1c2:
         # Chart 2: Flight Analysis by DOW (High to Low)
@@ -582,8 +580,8 @@ with tab_time:
                           color_discrete_map=colors_status)
         fig_dow.update_traces(line_shape='spline') 
         fig_dow = update_chart_layout(fig_dow)
-        fig_dow.update_layout(height=400)
-        st.plotly_chart(fig_dow, use_container_width=True)
+        fig_dow.update_layout(autosize=True, height=None)
+        st.plotly_chart(fig_dow, use_container_width=True, config={"responsive": True})
 
     r2c1, r2c2 = st.columns(2)
     with r2c1:
@@ -595,26 +593,26 @@ with tab_time:
         fig_d.add_trace(go.Scatter(x=day_stats['DAY'], y=day_stats['Delayed'], name='Delayed Flight', line=dict(color='#facc15', width=2)))
         fig_d.add_trace(go.Scatter(x=day_stats['DAY'], y=day_stats['Cancelled'], name='Cancelled Flight', line=dict(color='#ef4444', width=2)))
         
-        fig_d.update_layout(title="Flight Analysis by Days", xaxis_title="Day of Month", height=400,
+        fig_d.update_layout(title="Flight Analysis by Days", xaxis_title="Day of Month", autosize=True, height=None,
                             plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font={'color':'white'})
         fig_d.update_xaxes(showgrid=False)
         fig_d.update_yaxes(showgrid=False)
-        st.plotly_chart(fig_d, use_container_width=True)
+        st.plotly_chart(fig_d, use_container_width=True, config={"responsive": True})
 
     with r2c2:
         # Chart 4: Delay Type Analysis by Month (Stream)
         fig_stream = px.area(delay_melt, x='Month', y='Minutes', color='Type', title="Delay Type Analysis by Month")
         fig_stream.update_traces(line_shape='spline')
         fig_stream = update_chart_layout(fig_stream)
-        fig_stream.update_layout(height=400)
-        st.plotly_chart(fig_stream, use_container_width=True)
+        fig_stream.update_layout(autosize=True, height=None)
+        st.plotly_chart(fig_stream, use_container_width=True, config={"responsive": True})
 
     st.markdown("---")
 
 
 
 with tab_airline:
-    st.markdown("### Airline Performance Deep Dive")
+    st.markdown("### Airline Analysis")
 
     # Metrics Calculations
     airline_aircraft_delay_rows = filtered_df[(filtered_df['AIRLINE_DELAY'] > 0) | (filtered_df['LATE_AIRCRAFT_DELAY'] > 0)]
@@ -658,30 +656,24 @@ with tab_airline:
         
     with col_gauges:
         g1, g2, g3 = st.columns(3)
-        g1.plotly_chart(create_gauge_chart(avg_dep, "Avg Departure Delay", max_val=30, color="#f97316"), use_container_width=True)
-        g2.plotly_chart(create_gauge_chart(avg_arr, "Avg Arrival Delay", max_val=30, color="#f97316"), use_container_width=True)
-        g3.plotly_chart(create_gauge_chart(avg_aa_delay, "Avg Airline & A/C Delay", max_val=15, color="#f97316"), use_container_width=True)
+        g1.plotly_chart(create_gauge_chart(avg_dep, "Average Departure Delay", max_val=30, color="#f97316"), use_container_width=True)
+        g2.plotly_chart(create_gauge_chart(avg_arr, "Average Arrival Delay", max_val=30, color="#f97316"), use_container_width=True)
+        g3.plotly_chart(create_gauge_chart(avg_aa_delay, "Average Airline & A/C Delay", max_val=15, color="#f97316"), use_container_width=True)
 
     st.markdown("---")
     
     # Row 2: Flight Analysis by Airline (Stacked Bar)
-    st.markdown("---")
-    
-    # Row 2: Flight Analysis by Airline (Stacked Bar)
-    # Using st.columns([1]) to definitively break out of any previous column layout context
-    # Row 2: Flight Analysis by Airline (Stacked Bar)
-    st.markdown("#### Flight Analysis by Airline")
     airline_counts = get_status_counts(filtered_df, 'AIRLINE_NAME')
     airline_counts = airline_counts.sort_values('Total', ascending=False)
     
     airline_melt = airline_counts.melt(id_vars=['AIRLINE_NAME'], value_vars=['On Time', 'Delayed', 'Cancelled'], var_name='Status', value_name='Count')
     
     fig_airline_stack = px.bar(airline_melt, x='AIRLINE_NAME', y='Count', color='Status', 
-                               # title="Flight Analysis by Airline", 
+                               title="Flight Analysis by Airline", 
                                color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_airline_stack = update_chart_layout(fig_airline_stack)
-    fig_airline_stack.update_layout(autosize=True, height=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
-    st.plotly_chart(fig_airline_stack, use_container_width=True)
+    fig_airline_stack.update_layout(autosize=True, width=None, height=None, showlegend=True, legend=dict(orientation="h", y=-0.25, x=0.5, xanchor='center'), margin=dict(l=10, r=10, t=40, b=150))
+    st.plotly_chart(fig_airline_stack, use_container_width=True, config={"responsive": True})
     
     st.markdown("---")
     
@@ -698,21 +690,21 @@ with tab_airline:
         fig.update_traces(marker_color=color, texttemplate='%{text}%', textposition='inside')
         fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False) 
         fig = update_chart_layout(fig)
-        fig.update_layout(height=450, margin=dict(l=180, r=10, t=40, b=10))
+        fig.update_layout(height=None, margin=dict(l=180, r=10, t=40, b=10))
         return fig
 
     with c1:
-        st.plotly_chart(create_rank_chart(airline_counts, 'On Time %', '#22c55e', "On Time Flights % by Airline"), use_container_width=True)
+        st.plotly_chart(create_rank_chart(airline_counts, 'On Time %', '#22c55e', "On Time Flights % by Airline"), use_container_width=True, config={"responsive": True})
     with c2:
-        st.plotly_chart(create_rank_chart(airline_counts, 'Delayed %', '#f97316', "Delayed Flights % by Airline"), use_container_width=True)
+        st.plotly_chart(create_rank_chart(airline_counts, 'Delayed %', '#f97316', "Delayed Flights % by Airline"), use_container_width=True, config={"responsive": True})
     with c3:
-        st.plotly_chart(create_rank_chart(airline_counts, 'Cancelled %', '#ef4444', "Cancelled Flights % by Airline"), use_container_width=True)
+        st.plotly_chart(create_rank_chart(airline_counts, 'Cancelled %', '#ef4444', "Cancelled Flights % by Airline"), use_container_width=True, config={"responsive": True})
 
 
 
 # --- Tab: Airport Analysis ---
 with tab_airport:
-    st.markdown("### Airport Performance Analysis")
+    st.markdown("### Airport Analysis")
     
     render_kpi_header(filtered_df)
     
@@ -752,8 +744,9 @@ with tab_airport:
                        color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_main = update_chart_layout(fig_main)
 
-    fig_main.update_layout(height=None, autosize=True, width=None, showlegend=True, legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
-    st.plotly_chart(fig_main, use_container_width=True)
+    fig_main.update_layout(autosize=True, width=None, height=None, showlegend=True, legend=dict(orientation="h", y=-0.25, x=0.5, xanchor='center'), margin=dict(l=10, r=10, t=40, b=150))
+    with st.container():
+        st.plotly_chart(fig_main, use_container_width=True, config={"responsive": True})
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
@@ -778,16 +771,16 @@ with tab_airport:
     c_ot, c_dly, c_cnl = st.columns(3)
     
     with c_ot:
-         fig_ot = plot_ap_tree(airport_counts, 'On Time %', 'ORIGIN_AIRPORT', '#22c55e', "On Time %")
-         st.plotly_chart(fig_ot, use_container_width=True)
+         fig_ot = plot_ap_tree(airport_counts, 'On Time %', 'ORIGIN_AIRPORT', '#22c55e', "On Time % by Airport")
+         st.plotly_chart(fig_ot, use_container_width=True, config={"responsive": True})
          
     with c_dly:
-         fig_dly = plot_ap_tree(airport_counts, 'Delayed %', 'ORIGIN_AIRPORT', '#facc15', "Delayed %")
-         st.plotly_chart(fig_dly, use_container_width=True)
+         fig_dly = plot_ap_tree(airport_counts, 'Delayed %', 'ORIGIN_AIRPORT', '#facc15', "Delayed % by Airport")
+         st.plotly_chart(fig_dly, use_container_width=True, config={"responsive": True})
          
     with c_cnl:
-         fig_cnl = plot_ap_tree(airport_counts, 'Cancelled %', 'ORIGIN_AIRPORT', '#ef4444', "Cancelled %")
-         st.plotly_chart(fig_cnl, use_container_width=True)
+         fig_cnl = plot_ap_tree(airport_counts, 'Cancelled %', 'ORIGIN_AIRPORT', '#ef4444', "Cancelled % by Airport")
+         st.plotly_chart(fig_cnl, use_container_width=True, config={"responsive": True})
 
     st.markdown("---")
 # --- Tab: EDA ---
@@ -807,7 +800,7 @@ with tab_eda:
         fig_vol_m = px.area(vol_month, x='Month Name', y='Count', title="Flight Volume by Month", markers=True)
         fig_vol_m.update_traces(line_color='#3b82f6', fillcolor='rgba(59, 130, 246, 0.2)')
         fig_vol_m = update_chart_layout(fig_vol_m)
-        st.plotly_chart(fig_vol_m, use_container_width=True)
+        st.plotly_chart(fig_vol_m, use_container_width=True, config={"responsive": True})
         
     with q1_col2:
         # Volume by Day of Week
@@ -819,7 +812,7 @@ with tab_eda:
         fig_vol_d.update_traces(marker_color='#1d4ed8') # Strong blue
         fig_vol_d = update_chart_layout(fig_vol_d)
         fig_vol_d.update_layout(showlegend=False)
-        st.plotly_chart(fig_vol_d, use_container_width=True)
+        st.plotly_chart(fig_vol_d, use_container_width=True, config={"responsive": True})
         
     st.markdown("---")
 
@@ -859,7 +852,8 @@ with tab_eda:
     fig_comp = px.line(comp_trend, x='Month', y='Delayed_Pct', color='Type', title="Departure Delay % Trends (National vs BOS)", markers=True,
                        color_discrete_map={'National Average': '#9ca3af', 'Boston (BOS)': '#22c55e'})
     fig_comp = update_chart_layout(fig_comp)
-    st.plotly_chart(fig_comp, use_container_width=True)
+    with st.container():
+        st.plotly_chart(fig_comp, use_container_width=True, config={"responsive": True})
     
     st.markdown("---")
 
