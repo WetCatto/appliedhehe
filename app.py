@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from utils import load_data, apply_filters
+from utils import load_data, compute_metrics
 
 # --- Optimized Plotly Configuration ---
 # Disable unnecessary features to reduce CPU/memory overhead
@@ -15,7 +15,7 @@ PLOTLY_CONFIG = {
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Airline Flight Delays Dashboard",
-    page_icon="✈️",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -23,11 +23,15 @@ st.set_page_config(
 # --- Custom CSS (Modern "shadcn" Aesthetic) ---
 st.markdown("""
 <style>
-    /* Global Font - mimicking shadcn's default Inter/San-serif */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    /* Global Font - shadcn minimal style with Geist Sans */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif !important;
+        font-weight: 400;
+        letter-spacing: -0.011em;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
 
     /* Force Full Width */
@@ -41,42 +45,46 @@ st.markdown("""
 
     /* Main Background */
     .stApp {
-        background-color: #020817; /* shadcn dark bg */
-        color: #f8fafc; /* shadcn foreground */
+        background-color: #020817;
+        color: #f8fafc;
     }
     
     /* Metrics Cards */
     div[data-testid="stMetric"] {
-        background-color: #0f172a; /* Card bg */
-        border: 1px solid #1e293b; /* Card border */
-        border-radius: 8px; /* shadcn radius */
+        background-color: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
         padding: 16px;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         color: #f8fafc;
     }
     div[data-testid="stMetricLabel"] {
-        color: #94a3b8; /* Muted foreground */
-        font-size: 14px;
+        color: #94a3b8;
+        font-size: 13px;
         font-weight: 500;
+        letter-spacing: -0.006em;
     }
     div[data-testid="stMetricValue"] {
         color: #f8fafc;
         font-size: 24px;
-        font-weight: 700;
+        font-weight: 600;
+        letter-spacing: -0.025em;
     }
         border-bottom: 1px solid #2d2f3b;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: transparent;
         color: #9ca3af;
-        font-weight: 600;
-        font-size: 1rem;
+        font-weight: 500;
+        font-size: 0.95rem;
         padding-bottom: 12px;
+        letter-spacing: -0.011em;
     }
     .stTabs [aria-selected="true"] {
         background-color: transparent;
         color: #ffffff;
-        border-bottom: 2px solid #3b82f6; /* Bright blue active state */
+        border-bottom: 2px solid #3b82f6;
+        font-weight: 600;
     }
     
     /* Expander */
@@ -93,13 +101,21 @@ st.markdown("""
         border: 1px solid #2d2f3b;
     }
     
+    /* Headers - minimal style */
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 600 !important;
+        letter-spacing: -0.025em !important;
+    }
+    
+    h1 { font-size: 2rem !important; }
+    h2 { font-size: 1.5rem !important; }
+    h3 { font-size: 1.25rem !important; }
+    
 </style>
 """, unsafe_allow_html=True)
 
 # --- Data Loading ---
-# Force clear cache to ensure parquet is loaded correctly if stale
-st.cache_data.clear()
-
+# Load data once and pre-compute all metrics
 with st.spinner('Loading Application Data...'):
     flights, airlines, airports = load_data()
 
@@ -107,29 +123,9 @@ if flights is None or flights.empty:
     st.error("Could not load data. Please ensure CSV files are present in the directory.")
     st.stop()
 
-# --- Filters (Hidden/Default to All as requested) ---
-selected_month = 'All'
-selected_airline = 'All'
-selected_origin = 'All'
-
-# Apply Filters
-print("DEBUG: Pre-filter row count:", len(flights))
-print("DEBUG: Pre-filter DAY_OF_WEEK counts:\n", flights['DAY_OF_WEEK'].value_counts().sort_index())
-
-filtered_df = apply_filters(flights, selected_month, selected_airline, selected_origin)
-
-print("DEBUG: Post-filter row count:", len(filtered_df))
-print("DEBUG: Post-filter DAY_OF_WEEK counts:\n", filtered_df['DAY_OF_WEEK'].value_counts().sort_index())
-
-# --- Summary Metrics Calculations ---
-total_flights = len(filtered_df)
-on_time_flights = len(filtered_df[filtered_df['ARRIVAL_DELAY'] <= 15]) 
-delayed_flights = len(filtered_df[filtered_df['ARRIVAL_DELAY'] > 15])
-cancelled_flights = len(filtered_df[filtered_df['CANCELLED'] == 1])
-
-on_time_pct = (on_time_flights / total_flights * 100) if total_flights > 0 else 0
-delayed_pct = (delayed_flights / total_flights * 100) if total_flights > 0 else 0
-cancelled_pct = (cancelled_flights / total_flights * 100) if total_flights > 0 else 0
+# Pre-compute all metrics once - this is cached and reused across all tabs
+with st.spinner('Loading Data...'):
+    metrics = compute_metrics(flights)
 
 # --- Global Maps ---
 month_map_rev = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun',
@@ -158,19 +154,18 @@ def update_chart_layout(fig):
     )
     return fig
 
-def create_gauge_chart(value, title, max_val=None, color="#f97316"):
+def create_gauge_chart(value, title, max_val=None, color="#f97316", unit="min"):
     if max_val is None:
         max_val = value * 2 if value > 0 else 100
         
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
-        title = {'text': title, 'font': {'size': 18, 'color': 'white'}},
-        number = {'font': {'size': 36, 'color': 'white'}},
+        number = {'font': {'size': 36, 'color': 'white'}, 'suffix': f' {unit}'},
         domain = {'x': [0, 1], 'y': [0, 1]},
         gauge = {
             'axis': {'range': [None, max_val], 'tickwidth': 1, 'tickcolor': "white"},
-            'bar': {'color': color, 'thickness': 0.75}, # Thicker bar
+            'bar': {'color': color, 'thickness': 0.75},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'bordercolor': "gray",
@@ -181,11 +176,22 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316"):
             }
         }
     ))
+    
+    # Add centered title as annotation
+    fig.add_annotation(
+        text=title,
+        xref="paper", yref="paper",
+        x=0.5, y=1.05,
+        xanchor='center', yanchor='bottom',
+        showarrow=False,
+        font=dict(size=16, color='white', family='Inter')
+    )
+    
     fig.update_layout(
-        height=240, # Increased height for title space
-        margin={'t': 60, 'b': 20, 'l': 30, 'r': 30}, # Increased top margin
+        height=240,
+        margin={'t': 60, 'b': 20, 'l': 30, 'r': 30},
         paper_bgcolor='rgba(0,0,0,0)',
-        font={'color': "white"}
+        font={'color': "white", 'family': 'Inter'}
     )
     return fig
 
@@ -324,21 +330,19 @@ day_map = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
 
 
 # --- Reusable KPI Header Function ---
-def render_kpi_header(df):
-    total_airlines = df['AIRLINE'].nunique()
-    total_airports = df['ORIGIN_AIRPORT'].nunique()
-    total_flights = len(df)
+def render_kpi_header(metrics_dict):
+    """Render KPI header using pre-computed metrics"""
+    total_airlines = metrics_dict['total_airlines']
+    total_airports = metrics_dict['total_airports']
+    total_flights = metrics_dict['total_flights']
     
-    ot_count = ((df['ARRIVAL_DELAY'] <= 15) & (df['CANCELLED'] == 0)).sum()
-    dly_count = (df['ARRIVAL_DELAY'] > 15).sum()
-    cnl_count = df['CANCELLED'].sum()
+    ot_count = metrics_dict['on_time_flights']
+    dly_count = metrics_dict['delayed_flights']
+    cnl_count = metrics_dict['cancelled_flights']
     
-    # Calculate Percentages
-    ot_pct = (ot_count / total_flights * 100) if total_flights > 0 else 0
-    dly_pct = (dly_count / total_flights * 100) if total_flights > 0 else 0
-    cnl_pct = (cnl_count / total_flights * 100) if total_flights > 0 else 0
-    
-    # Block 5 (Red): ...
+    ot_pct = metrics_dict['on_time_pct']
+    dly_pct = metrics_dict['delayed_pct']
+    cnl_pct = metrics_dict['cancelled_pct']
     
     h1, h2, h3, h4, h5 = st.columns(5)
     
@@ -411,63 +415,35 @@ def render_kpi_header(df):
             
     st.markdown("---")
 
-# Helper for aggregating status counts
-def get_status_counts(df, group_col):
-    # Count total, on_time, delayed, cancelled
-    # Select only necessary columns to avoid FutureWarning about grouping columns
-    agg = df.groupby(group_col, observed=False)[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
-        'Total': len(x),
-        'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-        'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-        'Cancelled': x['CANCELLED'].sum()
-    })).reset_index()
-    return agg
-
 # --- Tab: Delay Analysis ---
 with tab_delay:
     st.markdown("### Delay Analysis")
     
-    render_kpi_header(filtered_df)
+    render_kpi_header(metrics)
         
-    # Calculate Delay Metrics
-    avg_airline_delay = filtered_df['AIRLINE_DELAY'].mean()
-    avg_aircraft_delay = filtered_df['LATE_AIRCRAFT_DELAY'].mean()
-    avg_system_delay = filtered_df['AIR_SYSTEM_DELAY'].mean()
-    avg_weather_delay = filtered_df['WEATHER_DELAY'].mean()
-    avg_security_delay = filtered_df['SECURITY_DELAY'].mean()
+    # Use pre-computed delay metrics
+    avg_airline_delay = metrics['avg_airline_delay']
+    avg_aircraft_delay = metrics['avg_aircraft_delay']
+    avg_system_delay = metrics['avg_system_delay']
+    avg_weather_delay = metrics['avg_weather_delay']
+    avg_security_delay = metrics['avg_security_delay']
     
-    # 5 Gauge Charts in a row (or 2 rows)
-    # Mockup implies a row or grid. Let's do 5 cols.
+    # 5 Gauge Charts in a row
     dg1, dg2, dg3, dg4, dg5 = st.columns(5)
     
-    # Helper is globally available: create_gauge_chart(value, title, max_val=None, color="#f97316")
-    # Assuming standard orange color for delays
-    
-    dg1.plotly_chart(create_gauge_chart(avg_airline_delay, "Average Airline Delay", max_val=30, color="#f97316"), use_container_width=True)
-    dg2.plotly_chart(create_gauge_chart(avg_aircraft_delay, "Average Aircraft Delay", max_val=30, color="#f97316"), use_container_width=True)
-    dg3.plotly_chart(create_gauge_chart(avg_system_delay, "Average System Delay", max_val=30, color="#f97316"), use_container_width=True)
-    dg4.plotly_chart(create_gauge_chart(avg_weather_delay, "Average Weather Delay", max_val=10, color="#f97316"), use_container_width=True)
-    dg5.plotly_chart(create_gauge_chart(avg_security_delay, "Average Security Delay", max_val=5, color="#f97316"), use_container_width=True)
+    dg1.plotly_chart(create_gauge_chart(avg_airline_delay, "Average Airline Delay", max_val=30, color="#f97316"), width="stretch")
+    dg2.plotly_chart(create_gauge_chart(avg_aircraft_delay, "Average Aircraft Delay", max_val=30, color="#f97316"), width="stretch")
+    dg3.plotly_chart(create_gauge_chart(avg_system_delay, "Average System Delay", max_val=30, color="#f97316"), width="stretch")
+    dg4.plotly_chart(create_gauge_chart(avg_weather_delay, "Average Weather Delay", max_val=10, color="#f97316"), width="stretch")
+    dg5.plotly_chart(create_gauge_chart(avg_security_delay, "Average Security Delay", max_val=5, color="#f97316"), width="stretch")
     
     st.markdown("---")
         
     # Chart 1 & 2
     dc_c1, dc_c2 = st.columns(2)
     
-    # Data Prep for Charts
-    delay_means_month = filtered_df.groupby('MONTH').agg({
-        'AIRLINE_DELAY': 'mean',
-        'LATE_AIRCRAFT_DELAY': 'mean',
-        'AIR_SYSTEM_DELAY': 'mean',
-        'WEATHER_DELAY': 'mean',
-        'DEPARTURE_DELAY': 'mean',
-        'ARRIVAL_DELAY': 'mean',
-        'TAXI_OUT': 'mean'
-    }).reset_index()
-    
-    delay_means_month['Avg Airline & Aircraft Delay'] = delay_means_month['AIRLINE_DELAY'] + delay_means_month['LATE_AIRCRAFT_DELAY']
-    delay_means_month['Avg Air System Delay'] = delay_means_month['AIR_SYSTEM_DELAY']
-    delay_means_month['Month'] = delay_means_month['MONTH'].map(month_map_rev)
+    # Use pre-computed delay means by month
+    delay_means_month = metrics['delay_means_month']
     
     with dc_c1:
         # Chart 1: Avg Airline & Aircraft Delay and Avg Air System Delay by Month (Stacked Bar)
@@ -476,7 +452,7 @@ with tab_delay:
                         color_discrete_map={'Avg Airline & Aircraft Delay': '#3b82f6', 'Avg Air System Delay': '#1e3a8a'})
         fig_c1 = update_chart_layout(fig_c1)
         fig_c1.update_layout(autosize=True, legend_title="", height=None)
-        st.plotly_chart(fig_c1, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_c1, width="stretch", config=PLOTLY_CONFIG)
         
     with dc_c2:
         # Chart 2: Avg Weather, Dep, Arr, Taxi Out Delay by Month (Stacked Bar)
@@ -488,68 +464,53 @@ with tab_delay:
                         )
         fig_c2 = update_chart_layout(fig_c2)
         fig_c2.update_layout(autosize=True, legend_title="", height=None)
-        st.plotly_chart(fig_c2, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_c2, width="stretch", config=PLOTLY_CONFIG)
         
     st.markdown("---")
     
     # Chart 3: Average Delay by Airline (Monthwise) - Multi-line Area
-    avg_delay_airline_month = filtered_df.groupby(['MONTH', 'AIRLINE_NAME'])['ARRIVAL_DELAY'].mean().reset_index()
-    avg_delay_airline_month['Month'] = avg_delay_airline_month['MONTH'].map(month_map_rev)
+    avg_delay_airline_month = metrics['avg_delay_airline_month']
     
-    # Reverting to Area chart as requested ("stacked line graph like before"), with spline smoothing
+    # Define distinct color palette for airlines (14 unique colors)
+    airline_colors = [
+        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+        '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+        '#14b8a6', '#f43f5e', '#22d3ee', '#a855f7'
+    ]
+    
+    # Create color map for each unique airline
+    unique_airlines = avg_delay_airline_month['AIRLINE_NAME'].unique()
+    color_map = {airline: airline_colors[i % len(airline_colors)] for i, airline in enumerate(unique_airlines)}
+    
+    # Reverting to Area chart as requested
     fig_c3 = px.area(avg_delay_airline_month, x='Month', y='ARRIVAL_DELAY', color='AIRLINE_NAME',
                     title="Average Delay by Airline (Monthwise)",
-                    labels={'ARRIVAL_DELAY': 'Average Delay'})
+                    labels={'ARRIVAL_DELAY': 'Average Delay'},
+                    color_discrete_map=color_map)
     fig_c3.update_traces(line_shape='spline')
-    # Use 'stackgroup=None' to prevent values from summing up, allowing negative values to display correctly as absolute plots.
-    # This keeps the "filled/stacked" look but is mathematically correct for mixed signs.
     fig_c3.update_traces(stackgroup=None, fill='tozeroy') 
     fig_c3 = update_chart_layout(fig_c3)
     fig_c3.update_layout(autosize=True, width=None, height=None, showlegend=True, legend=dict(orientation="h", y=-0.25, x=0.5, xanchor='center'), margin=dict(l=10, r=10, t=40, b=150))
     with st.container():
-        st.plotly_chart(fig_c3, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_c3, width="stretch", config=PLOTLY_CONFIG)
 
-# --- Tab: Time Analysis ---
 # --- Tab: Time Analysis ---
 with tab_time:
     st.markdown("### Temporal Flight Analysis")
     
-    render_kpi_header(filtered_df)
+    render_kpi_header(metrics)
     
-    # helper for aggregates if needed, but we can do inline
-    def get_time_counts(df, group_col):
-         agg = df.groupby(group_col)[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
-            'Total': len(x),
-            'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-            'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-            'Cancelled': x['CANCELLED'].sum()
-        })).reset_index()
-         return agg
-         
-    # Prepare Data
+    # Use pre-computed time stats
+    month_stats = metrics['month_stats']
+    dow_stats = metrics['dow_stats']
+    day_stats = metrics['day_stats']
+    delay_stream = metrics['delay_stream']
     
-    # 1. Month Data
-    month_stats = get_time_counts(filtered_df, 'MONTH')
-    month_stats['Month Name'] = month_stats['MONTH'].map(month_map_rev)
+    # Prepare melted data for charts
     melted_month = month_stats.melt(id_vars=['Month Name'], value_vars=['On Time', 'Delayed', 'Cancelled'], var_name='Status', value_name='Count')
-    
-    # 2. DOW Data
-    dow_stats = get_time_counts(filtered_df, 'DAY_OF_WEEK')
-    # Map 1-7 to names. 1=Mon? Usually. Let's check Utils or map.
-    # Assuming 1=Mon, 7=Sun in standard pandas/data. OR 1 could be Sunday.
-    # Given the chart names "Tue, Fri...", let's assume standard names.
-    dow_map = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
-    dow_stats['Day Name'] = dow_stats['DAY_OF_WEEK'].map(dow_map)
-    # Sort by Total Flight Volume Descending for "High to Low" area chart
-    dow_stats = dow_stats.sort_values('Total', ascending=False)
     melted_dow = dow_stats.melt(id_vars=['Day Name'], value_vars=['On Time', 'Delayed', 'Cancelled'], var_name='Status', value_name='Count')
     
-    # 3. Days Data (1-31)
-    day_stats = get_time_counts(filtered_df, 'DAY')
-    
-    # 4. Delay Type Data
-    delay_stream = filtered_df.groupby('MONTH')[['AIRLINE_DELAY', 'LATE_AIRCRAFT_DELAY', 'AIR_SYSTEM_DELAY', 'SECURITY_DELAY', 'WEATHER_DELAY', 'TAXI_OUT']].sum().reset_index()
-    delay_stream['Month'] = delay_stream['MONTH'].map(month_map_rev)
+    # Delay type melted data
     delay_melt = delay_stream.melt(id_vars=['Month'], var_name='Type', value_name='Minutes')
     type_map = {
         'AIR_SYSTEM_DELAY': 'Air System', 'LATE_AIRCRAFT_DELAY': 'Aircraft Delay',
@@ -559,15 +520,7 @@ with tab_time:
     delay_melt['Type'] = delay_melt['Type'].map(type_map)
 
     # Common Colors for Status
-    colors_status = {'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'} # Green, Yellow, Red
-    # Total usually is blue if standalone, but stacked usually implies sum. User image colors: Blue, Green, Yellow, Red blocks flowing.
-    # It seems "Total Flights" is the top layer?
-    # If we stack OnTime+Delayed+Cancelled, we get Total.
-    # The image shows "Total Flights" (Blue) as a separate big layer?
-    # Or maybe it's just the label.
-    # If I stack OnTime, Delayed, Cancelled, the sum is Total.
-    # If I add a 'Total' Series, it doubles the volume if stacked.
-    # I will just stack the 3 components.
+    colors_status = {'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'}
     
     # Layout Grid
     r1c1, r1c2 = st.columns(2)
@@ -578,23 +531,20 @@ with tab_time:
         fig_m.update_traces(line_shape='spline')
         fig_m = update_chart_layout(fig_m)
         fig_m.update_layout(autosize=True, height=None)
-        st.plotly_chart(fig_m, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_m, width="stretch", config=PLOTLY_CONFIG)
         
     with r1c2:
         # Chart 2: Flight Analysis by DOW (High to Low)
-        # To make "High to Low" stacked area using categorical data, we need to sort the X-axis by volume.
-        # PX Area respects category order.
         fig_dow = px.area(melted_dow, x='Day Name', y='Count', color='Status', title="Flight Analysis by Day of Week (High to Low)",
                           color_discrete_map=colors_status)
         fig_dow.update_traces(line_shape='spline') 
         fig_dow = update_chart_layout(fig_dow)
         fig_dow.update_layout(autosize=True, height=None)
-        st.plotly_chart(fig_dow, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_dow, width="stretch", config=PLOTLY_CONFIG)
 
     r2c1, r2c2 = st.columns(2)
     with r2c1:
         # Chart 3: Flight Analysis by Days (Line)
-        # Line chart of Total, On Time, Delayed, Cancelled
         fig_d = go.Figure()
         fig_d.add_trace(go.Scatter(x=day_stats['DAY'], y=day_stats['Total'], name='Total Flights', line=dict(color='#3b82f6', width=3)))
         fig_d.add_trace(go.Scatter(x=day_stats['DAY'], y=day_stats['On Time'], name='On Time Flight', line=dict(color='#22c55e', width=2)))
@@ -605,7 +555,7 @@ with tab_time:
                             plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font={'color':'white'})
         fig_d.update_xaxes(showgrid=False)
         fig_d.update_yaxes(showgrid=False)
-        st.plotly_chart(fig_d, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_d, width="stretch", config=PLOTLY_CONFIG)
 
     with r2c2:
         # Chart 4: Delay Type Analysis by Month (Stream)
@@ -613,43 +563,24 @@ with tab_time:
         fig_stream.update_traces(line_shape='spline')
         fig_stream = update_chart_layout(fig_stream)
         fig_stream.update_layout(autosize=True, height=None)
-        st.plotly_chart(fig_stream, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_stream, width="stretch", config=PLOTLY_CONFIG)
 
     st.markdown("---")
-
 
 
 with tab_airline:
     st.markdown("### Airline Analysis")
 
-    # Metrics Calculations
-    airline_aircraft_delay_rows = filtered_df[(filtered_df['AIRLINE_DELAY'] > 0) | (filtered_df['LATE_AIRCRAFT_DELAY'] > 0)]
-    aa_delay_count = len(airline_aircraft_delay_rows)
-    total_flights = len(filtered_df)
-    aa_delay_pct = (aa_delay_count / total_flights * 100) if total_flights > 0 else 0
+    # Use pre-computed airline metrics
+    aa_delay_count = metrics['aa_delay_count']
+    aa_delay_pct = metrics['aa_delay_pct']
+    avg_dep = metrics['avg_dep']
+    avg_arr = metrics['avg_arr']
+    avg_aa_delay = metrics['avg_aa_delay']
     
-    render_kpi_header(filtered_df)
+    render_kpi_header(metrics)
     
     # --- Metrics & Gauges Row ---
-    # Metrics
-    aa_delay_df = filtered_df[ (filtered_df['AIRLINE_DELAY'] > 0) | (filtered_df['LATE_AIRCRAFT_DELAY'] > 0) ]
-    aa_delay_count = len(aa_delay_df)
-    aa_delay_pct = (aa_delay_count / len(filtered_df) * 100) if len(filtered_df) > 0 else 0
-    
-    avg_dep = filtered_df['DEPARTURE_DELAY'].mean()
-    avg_arr = filtered_df['ARRIVAL_DELAY'].mean()
-    # Avg Airline & Aircraft Delay: Mean of (Airline + Late Aircraft) DELAY minutes, where > 0? 
-    # Or just mean of the columns. Usually "Avg Delay" implies mean of values including zeros or excluding?
-    # Given the gauge value is 1.79K (Wait, 1.79K? That's huge for minutes. Maybe it's total count? 
-    # But title says "Average ...". If it's 1.79K, maybe sum? 
-    # Let's check mockup again. "Airline & Aircraft Delayed Flights 25K". "Average ... Delay 1.79K". 
-    # If delay minutes sum is 45.13M, average can't be 1.79K unless filtered.
-    # If filtered to only delayed flights? 
-    # Let's assume Average of non-zero delays or just use the mean. 
-    # If mean is small (e.g. 10 mins), 1.79 is weird. Maybe 1.79 mins?
-    # Let's stick thereto standard mean for now.
-    avg_aa_delay = (filtered_df['AIRLINE_DELAY'].fillna(0) + filtered_df['LATE_AIRCRAFT_DELAY'].fillna(0)).mean()
-    
     col_metrics, col_gauges = st.columns([1.5, 3.5])
     
     with col_metrics:
@@ -664,15 +595,14 @@ with tab_airline:
         
     with col_gauges:
         g1, g2, g3 = st.columns(3)
-        g1.plotly_chart(create_gauge_chart(avg_dep, "Average Departure Delay", max_val=30, color="#f97316"), use_container_width=True)
-        g2.plotly_chart(create_gauge_chart(avg_arr, "Average Arrival Delay", max_val=30, color="#f97316"), use_container_width=True)
-        g3.plotly_chart(create_gauge_chart(avg_aa_delay, "Average Airline & A/C Delay", max_val=15, color="#f97316"), use_container_width=True)
+        g1.plotly_chart(create_gauge_chart(avg_dep, "Average Departure Delay", max_val=30, color="#f97316"), width="stretch")
+        g2.plotly_chart(create_gauge_chart(avg_arr, "Average Arrival Delay", max_val=30, color="#f97316"), width="stretch")
+        g3.plotly_chart(create_gauge_chart(avg_aa_delay, "Average Airline & A/C Delay", max_val=15, color="#f97316"), width="stretch")
 
     st.markdown("---")
     
     # Row 2: Flight Analysis by Airline (Stacked Bar)
-    airline_counts = get_status_counts(filtered_df, 'AIRLINE_NAME')
-    airline_counts = airline_counts.sort_values('Total', ascending=False)
+    airline_counts = metrics['airline_counts']
     
     airline_melt = airline_counts.melt(id_vars=['AIRLINE_NAME'], value_vars=['On Time', 'Delayed', 'Cancelled'], var_name='Status', value_name='Count')
     
@@ -681,16 +611,12 @@ with tab_airline:
                                color_discrete_map={'On Time': '#22c55e', 'Delayed': '#facc15', 'Cancelled': '#ef4444'})
     fig_airline_stack = update_chart_layout(fig_airline_stack)
     fig_airline_stack.update_layout(autosize=True, width=None, height=None, showlegend=True, legend=dict(orientation="h", y=-0.25, x=0.5, xanchor='center'), margin=dict(l=10, r=10, t=40, b=150))
-    st.plotly_chart(fig_airline_stack, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_airline_stack, width="stretch", config=PLOTLY_CONFIG)
     
     st.markdown("---")
     
     # Row 3: Ranked Rate Charts
     c1, c2, c3 = st.columns(3)
-    
-    airline_counts['On Time %'] = (airline_counts['On Time'] / airline_counts['Total'] * 100).round(2)
-    airline_counts['Delayed %'] = (airline_counts['Delayed'] / airline_counts['Total'] * 100).round(2)
-    airline_counts['Cancelled %'] = (airline_counts['Cancelled'] / airline_counts['Total'] * 100).round(2)
     
     def create_rank_chart(df, col, color, title):
         top_10 = df.nlargest(10, col)
@@ -702,44 +628,21 @@ with tab_airline:
         return fig
 
     with c1:
-        st.plotly_chart(create_rank_chart(airline_counts, 'On Time %', '#22c55e', "On Time Flights % by Airline"), use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(create_rank_chart(airline_counts, 'On Time %', '#22c55e', "On Time Flights % by Airline"), width="stretch", config=PLOTLY_CONFIG)
     with c2:
-        st.plotly_chart(create_rank_chart(airline_counts, 'Delayed %', '#f97316', "Delayed Flights % by Airline"), use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(create_rank_chart(airline_counts, 'Delayed %', '#f97316', "Delayed Flights % by Airline"), width="stretch", config=PLOTLY_CONFIG)
     with c3:
-        st.plotly_chart(create_rank_chart(airline_counts, 'Cancelled %', '#ef4444', "Cancelled Flights % by Airline"), use_container_width=True, config=PLOTLY_CONFIG)
-
+        st.plotly_chart(create_rank_chart(airline_counts, 'Cancelled %', '#ef4444', "Cancelled Flights % by Airline"), width="stretch", config=PLOTLY_CONFIG)
 
 
 # --- Tab: Airport Analysis ---
 with tab_airport:
     st.markdown("### Airport Analysis")
     
-    render_kpi_header(filtered_df)
+    render_kpi_header(metrics)
     
-    # helper for airport aggregates
-    def get_airport_counts(df):
-         agg = df.groupby('ORIGIN_AIRPORT', observed=False)[['ARRIVAL_DELAY', 'CANCELLED']].apply(lambda x: pd.Series({
-            'Total': len(x),
-            'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-            'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-            'Cancelled': x['CANCELLED'].sum()
-        })).reset_index()
-         return agg
-
-    # Prepare Data
-    # Top 50 airports by volume for analysis to avoid clutter
-    top_airports_list = filtered_df['ORIGIN_AIRPORT'].value_counts().nlargest(50).index.tolist()
-    airport_df_top = filtered_df[filtered_df['ORIGIN_AIRPORT'].isin(top_airports_list)]
-    
-    airport_counts = get_airport_counts(airport_df_top)
-    
-    # Calculate Percentages
-    airport_counts['On Time %'] = (airport_counts['On Time'] / airport_counts['Total'] * 100).fillna(0)
-    airport_counts['Delayed %'] = (airport_counts['Delayed'] / airport_counts['Total'] * 100).fillna(0)
-    airport_counts['Cancelled %'] = (airport_counts['Cancelled'] / airport_counts['Total'] * 100).fillna(0)
-    
-    # Layout: Flight Analysis (Left Big), Decomposition Trees (Right 3 Small)
-    # Similar to Airline tab
+    # Use pre-computed airport counts
+    airport_counts = metrics['airport_counts']
     
     # Layout: Flight Analysis (Top - Full Width), Decomposition Trees (Bottom - 3 Cols)
     
@@ -754,7 +657,7 @@ with tab_airport:
 
     fig_main.update_layout(autosize=True, width=None, height=None, showlegend=True, legend=dict(orientation="h", y=-0.25, x=0.5, xanchor='center'), margin=dict(l=10, r=10, t=40, b=150))
     with st.container():
-        st.plotly_chart(fig_main, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_main, width="stretch", config=PLOTLY_CONFIG)
     
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
@@ -762,13 +665,13 @@ with tab_airport:
     def plot_ap_tree(df, col_val, col_label, color, title):
          df_sorted = df.sort_values(col_val, ascending=False).head(10)
          fig = px.bar(df_sorted, y=col_label, x=col_val, orientation='h', title=title, text=col_val)
-         fig.update_traces(marker_color=color, texttemplate='%{text:.1f}%', textposition='outside', width=0.6, cliponaxis=False) # Increased width for visibility
+         fig.update_traces(marker_color=color, texttemplate='%{text:.1f}%', textposition='outside', width=0.6, cliponaxis=False)
          fig.update_layout(
              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
              font={'color': 'white', 'family': 'Inter'},
              xaxis={'visible': False}, 
-             yaxis={'visible': True, 'showgrid': False, 'tickfont': {'size': 14}}, # Bigger labels
-             margin=dict(l=10, r=80, t=40, b=10), # More right margin for outside text
+             yaxis={'visible': True, 'showgrid': False, 'tickfont': {'size': 14}},
+             margin=dict(l=10, r=80, t=40, b=10),
              height=350,
              showlegend=False
          )
@@ -780,15 +683,15 @@ with tab_airport:
     
     with c_ot:
          fig_ot = plot_ap_tree(airport_counts, 'On Time %', 'ORIGIN_AIRPORT', '#22c55e', "On Time % by Airport")
-         st.plotly_chart(fig_ot, use_container_width=True, config=PLOTLY_CONFIG)
+         st.plotly_chart(fig_ot, width="stretch", config=PLOTLY_CONFIG)
          
     with c_dly:
          fig_dly = plot_ap_tree(airport_counts, 'Delayed %', 'ORIGIN_AIRPORT', '#facc15', "Delayed % by Airport")
-         st.plotly_chart(fig_dly, use_container_width=True, config=PLOTLY_CONFIG)
+         st.plotly_chart(fig_dly, width="stretch", config=PLOTLY_CONFIG)
          
     with c_cnl:
          fig_cnl = plot_ap_tree(airport_counts, 'Cancelled %', 'ORIGIN_AIRPORT', '#ef4444', "Cancelled % by Airport")
-         st.plotly_chart(fig_cnl, use_container_width=True, config=PLOTLY_CONFIG)
+         st.plotly_chart(fig_cnl, width="stretch", config=PLOTLY_CONFIG)
 
     st.markdown("---")
 # --- Tab: EDA ---
@@ -801,86 +704,63 @@ with tab_eda:
     q1_col1, q1_col2 = st.columns(2)
     
     with q1_col1:
-        # Volume by Month
-        vol_month = filtered_df.groupby('MONTH').size().reset_index(name='Count')
-        vol_month['Month Name'] = vol_month['MONTH'].map(month_map_rev)
+        # Use pre-computed volume by month
+        vol_month = metrics['vol_month']
         
         fig_vol_m = px.area(vol_month, x='Month Name', y='Count', title="Flight Volume by Month", markers=True)
         fig_vol_m.update_traces(line_color='#3b82f6', fillcolor='rgba(59, 130, 246, 0.2)')
         fig_vol_m = update_chart_layout(fig_vol_m)
-        st.plotly_chart(fig_vol_m, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_vol_m, width="stretch", config=PLOTLY_CONFIG)
         
     with q1_col2:
-        # Volume by Day of Week
-        # Ensure 1-7 index using explicit reindexing with int keys
-        vol_day = filtered_df.groupby('DAY_OF_WEEK').size().reindex([1, 2, 3, 4, 5, 6, 7], fill_value=0).reset_index(name='Count')
-        vol_day['Day Name'] = vol_day['DAY_OF_WEEK'].map(day_map)
+        # Use pre-computed volume by day of week
+        vol_day = metrics['vol_day']
         
         fig_vol_d = px.bar(vol_day, x='Day Name', y='Count', title="Flight Volume by Day of Week")
-        fig_vol_d.update_traces(marker_color='#1d4ed8') # Strong blue
+        fig_vol_d.update_traces(marker_color='#1d4ed8')
         fig_vol_d = update_chart_layout(fig_vol_d)
         fig_vol_d.update_layout(showlegend=False)
-        st.plotly_chart(fig_vol_d, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_vol_d, width="stretch", config=PLOTLY_CONFIG)
         
     st.markdown("---")
 
     st.markdown("#### 2. Departure Delay Insights")
     st.markdown("**Percetage of flights with departure delay (>15 mins) and average delay duration.**")
 
-    # Q2 Calculations
-    # Definition: Delayed if DEPARTURE_DELAY > 15
-    dep_delayed_flights = filtered_df[filtered_df['DEPARTURE_DELAY'] > 15]
-    pct_dep_delayed = (len(dep_delayed_flights) / len(filtered_df) * 100) if len(filtered_df) > 0 else 0
-    avg_dep_delay_duration = dep_delayed_flights['DEPARTURE_DELAY'].mean() if len(dep_delayed_flights) > 0 else 0
+    # Use pre-computed departure delay metrics
+    pct_dep_delayed = metrics['pct_dep_delayed']
+    avg_dep_delay_duration = metrics['avg_dep_delay_duration']
     
     q2_c1, q2_c2 = st.columns(2)
     with q2_c1:
          st.metric("Departure Delayed %", f"{pct_dep_delayed:.2f}%")
     with q2_c2:
-         st.metric("Avg Delay Duration (min)", f"{avg_dep_delay_duration:.1f}", help="Average minutes for flights that were delayed > 15m")
+         st.metric("Avg Delay Duration (min)", f"{avg_dep_delay_duration:.1f}", help="Average minutes for flights that were delayed >15m")
          
     st.markdown("---")
     
     st.markdown("#### 3. Delay Trends: Overall vs Boston (BOS)")
     st.markdown("**How does the % of delayed flights vary throughout the year? Comparison with BOS.**")
     
-    # Overall Trend
-    monthly_stats = filtered_df.groupby('MONTH')['DEPARTURE_DELAY'].apply(lambda x: (x > 15).mean() * 100).reset_index(name='Delayed_Pct')
-    monthly_stats['Type'] = 'National Average'
-    
-    # BOS Trend
-    bos_flights = filtered_df[filtered_df['ORIGIN_AIRPORT'] == 'BOS']
-    bos_stats = bos_flights.groupby('MONTH')['DEPARTURE_DELAY'].apply(lambda x: (x > 15).mean() * 100).reset_index(name='Delayed_Pct')
-    bos_stats['Type'] = 'Boston (BOS)'
-    
-    # Combine
-    comp_trend = pd.concat([monthly_stats, bos_stats])
-    comp_trend['Month'] = comp_trend['MONTH'].map(month_map_rev)
+    # Use pre-computed comparison trend
+    comp_trend = metrics['comp_trend']
     
     fig_comp = px.line(comp_trend, x='Month', y='Delayed_Pct', color='Type', title="Departure Delay % Trends (National vs BOS)", markers=True,
                        color_discrete_map={'National Average': '#9ca3af', 'Boston (BOS)': '#22c55e'})
     fig_comp = update_chart_layout(fig_comp)
     with st.container():
-        st.plotly_chart(fig_comp, use_container_width=True, config=PLOTLY_CONFIG)
+        st.plotly_chart(fig_comp, width="stretch", config=PLOTLY_CONFIG)
     
     st.markdown("---")
 
     st.markdown("#### 4. Cancellation Analysis")
     st.markdown("**How many flights were cancelled in 2015? Why?**")
     
-    # Q4 Calculations
-    total_cancelled = filtered_df['CANCELLED'].sum()
-    pct_cancelled = (total_cancelled / len(filtered_df) * 100) if len(filtered_df) > 0 else 0
-    
-    # Reasons: CANCELLATION_REASON (A=Carrier, B=Weather, C=NAS, D=Security)
-    cancel_counts = filtered_df[filtered_df['CANCELLED'] == 1]['CANCELLATION_REASON'].value_counts()
-    
-    # Handle potentially missing keys
-    val_A = cancel_counts.get('A', 0)
-    val_B = cancel_counts.get('B', 0)
-    
-    pct_weather = (val_B / total_cancelled * 100) if total_cancelled > 0 else 0
-    pct_airline = (val_A / total_cancelled * 100) if total_cancelled > 0 else 0
+    # Use pre-computed cancellation metrics
+    total_cancelled = metrics['total_cancelled']
+    pct_cancelled = metrics['pct_cancelled']
+    pct_weather = metrics['pct_weather']
+    pct_airline = metrics['pct_airline']
     
     q4_c1, q4_c2, q4_c3 = st.columns(3)
     with q4_c1:
