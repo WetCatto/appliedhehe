@@ -181,15 +181,15 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316", unit="min"):
     fig.add_annotation(
         text=title,
         xref="paper", yref="paper",
-        x=0.5, y=1.05,
-        xanchor='center', yanchor='bottom',
+        x=0.5, y=1.15,
+        xanchor='center', yanchor='middle',
         showarrow=False,
-        font=dict(size=16, color='white', family='Inter')
+        font=dict(size=14, color='white', family='Inter')
     )
     
     fig.update_layout(
         height=240,
-        margin={'t': 60, 'b': 20, 'l': 30, 'r': 30},
+        margin={'t': 70, 'b': 20, 'l': 30, 'r': 30},
         paper_bgcolor='rgba(0,0,0,0)',
         font={'color': "white", 'family': 'Inter'}
     )
