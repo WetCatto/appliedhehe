@@ -154,7 +154,7 @@ def compute_metrics(flights):
         'Cancelled': x['CANCELLED'].sum()
     }), include_groups=False).reset_index()
     dow_stats['Day Name'] = dow_stats['DAY_OF_WEEK'].map(day_map)
-    dow_stats = dow_stats.sort_values('Total', ascending=False)
+    dow_stats = dow_stats.sort_values('DAY_OF_WEEK', ascending=True)
     metrics['dow_stats'] = dow_stats
     
     # Day stats (1-31)
