@@ -535,7 +535,7 @@ with tab_time:
         
     with r1c2:
         # Chart 2: Flight Analysis by DOW (High to Low)
-        fig_dow = px.area(melted_dow, x='Day Name', y='Count', color='Status', title="Flight Analysis by Day of Week (High to Low)",
+        fig_dow = px.area(melted_dow, x='Day Name', y='Count', color='Status', title="Flight Analysis by Day of Week",
                           color_discrete_map=colors_status)
         fig_dow.update_traces(line_shape='spline') 
         fig_dow = update_chart_layout(fig_dow)
