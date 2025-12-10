@@ -181,8 +181,8 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316", unit="min"):
     fig.add_annotation(
         text=title,
         xref="paper", yref="paper",
-        x=0.5, y=1.15,
-        xanchor='center', yanchor='middle',
+        x=0.5, y=0.95,
+        xanchor='center', yanchor='bottom',
         showarrow=False,
         font=dict(size=14, color='white', family='Inter')
     )
