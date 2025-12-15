@@ -3,6 +3,6 @@ __pycache__/
 *.pyc
 *.pyo
 *.pkl
-flight_delay_model.pkl
+!flight_delay_model.pkl
 .DS_Store
 *.log

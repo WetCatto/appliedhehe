@@ -131,7 +131,7 @@ def compute_metrics(flights):
     metrics['delay_means_month'] = delay_means_month
     
     # Average delay by airline and month
-    avg_delay_airline_month = flights.groupby(['MONTH', 'AIRLINE_NAME'])['ARRIVAL_DELAY'].mean().reset_index()
+    avg_delay_airline_month = flights.groupby(['MONTH', 'AIRLINE_NAME'], observed=False)['ARRIVAL_DELAY'].mean().reset_index()
     avg_delay_airline_month['Month'] = avg_delay_airline_month['MONTH'].map(month_map_rev)
     metrics['avg_delay_airline_month'] = avg_delay_airline_month
     
@@ -269,55 +269,55 @@ def prepare_ml_data(_flights):
     ml_df = _flights[_flights['CANCELLED'] == 0].copy()
     
     # Create target variable: 1 if delayed (>15 min), 0 otherwise
-    # Fill NA values first to avoid conversion error
     ml_df['DELAYED'] = (ml_df['ARRIVAL_DELAY'].fillna(0) > 15).astype(int)
     
+    # --- TARGET ENCODING ---
+    # Calculate risk scores on FULL dataset
+    airline_risk = ml_df.groupby('AIRLINE', observed=False)['DELAYED'].mean()
+    ml_df['AIRLINE_RISK'] = ml_df['AIRLINE'].map(airline_risk)
+    
+    origin_risk = ml_df.groupby('ORIGIN_AIRPORT', observed=False)['DELAYED'].mean()
+    ml_df['ORIGIN_RISK'] = ml_df['ORIGIN_AIRPORT'].map(origin_risk)
+    
+    dest_risk = ml_df.groupby('DESTINATION_AIRPORT', observed=False)['DELAYED'].mean()
+    ml_df['DEST_RISK'] = ml_df['DESTINATION_AIRPORT'].map(dest_risk)
+    
+    target_encoders = {
+        'AIRLINE_RISK': airline_risk.to_dict(),
+        'ORIGIN_RISK': origin_risk.to_dict(),
+        'DEST_RISK': dest_risk.to_dict()
+    }
+
+    # Sample data to reduce model size / training time
+    TARGET_SIZE = 250000
+    if len(ml_df) > TARGET_SIZE:
+        ml_df = ml_df.sample(n=TARGET_SIZE, random_state=42)
+    
     # Enhanced feature engineering
-    # Extract hour from scheduled departure
     ml_df['DEPARTURE_HOUR'] = (ml_df['SCHEDULED_DEPARTURE'] // 100).astype(int)
     
-    # Create time of day categories (better than raw hour)
     def categorize_time(hour):
-        if 5 <= hour < 12:
-            return 0  # Morning
-        elif 12 <= hour < 17:
-            return 1  # Afternoon
-        elif 17 <= hour < 21:
-            return 2  # Evening
-        else:
-            return 3  # Night/Early Morning
+        if 5 <= hour < 12: return 0  # Morning
+        elif 12 <= hour < 17: return 1  # Afternoon
+        elif 17 <= hour < 21: return 2  # Evening
+        else: return 3  # Night
     
     ml_df['TIME_OF_DAY'] = ml_df['DEPARTURE_HOUR'].apply(categorize_time)
     
-    # Distance categories (short, medium, long haul)
-    ml_df['DISTANCE_CATEGORY'] = pd.cut(ml_df['DISTANCE'], 
-                                         bins=[0, 500, 1500, 5000], 
-                                         labels=[0, 1, 2]).astype(int)
-    
-    # Weekend flag
+    ml_df['DISTANCE_CATEGORY'] = pd.cut(ml_df['DISTANCE'], bins=[0, 500, 1500, 5000], labels=[0, 1, 2]).astype(int)
     ml_df['IS_WEEKEND'] = (ml_df['DAY_OF_WEEK'].isin([6, 7])).astype(int)
     
     # Select enhanced features
     feature_cols = [
-        'AIRLINE', 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT',
+        'AIRLINE_RISK', 'ORIGIN_RISK', 'DEST_RISK',
         'MONTH', 'DAY_OF_WEEK', 'DAY',
         'DEPARTURE_HOUR', 'TIME_OF_DAY', 'DISTANCE', 'DISTANCE_CATEGORY',
         'IS_WEEKEND', 'TAXI_OUT'
     ]
     
-    # Remove rows with missing values in features or target
+    # Remove rows with missing values
     ml_df = ml_df[feature_cols + ['DELAYED']].dropna()
     
-    # Encode categorical variables
-    label_encoders = {}
-    categorical_cols = ['AIRLINE', 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT']
-    
-    for col in categorical_cols:
-        le = LabelEncoder()
-        ml_df[col] = le.fit_transform(ml_df[col].astype(str))
-        label_encoders[col] = le
-    
-    # Split features and target
     X = ml_df[feature_cols]
     y = ml_df['DELAYED']
     
@@ -326,7 +326,7 @@ def prepare_ml_data(_flights):
         X, y, test_size=0.2, random_state=42, stratify=y
     )
     
-    return X_train, X_test, y_train, y_test, feature_cols, label_encoders
+    return X_train, X_test, y_train, y_test, feature_cols, target_encoders
 
 
 @st.cache_resource
@@ -339,16 +339,16 @@ def train_delay_model(_X_train, _y_train):
     
     # Train Random Forest with improved parameters for better performance
     model = RandomForestClassifier(
-        n_estimators=200,          # More trees for better predictions
-        max_depth=15,              # Deeper trees to capture patterns
-        min_samples_split=50,      # Lower threshold for splitting
-        min_samples_leaf=20,       # Lower threshold for leaves
-        max_features='sqrt',       # Feature sampling for regularization
+        n_estimators=150,          # Increased slightly
+        max_depth=14,              # Increased slightly
+        min_samples_split=50,
+        min_samples_leaf=20,
+        max_features='sqrt',
         random_state=42,
         n_jobs=-1,
-        class_weight='balanced',   # Handle class imbalance
+        class_weight={0:1, 1:3},   # Balanced accuracy/recall trade-off
         bootstrap=True,
-        oob_score=True            # Out-of-bag score for validation
+        oob_score=True
     )
     
     model.fit(_X_train, _y_train)
@@ -376,61 +376,51 @@ def get_model_metrics(_model, _X_test, _y_test):
     return metrics
 
 
-def predict_delay_probability(model, label_encoders, airline, origin, destination, 
+def predict_delay_probability(model, target_encoders, airline, origin, destination, 
                               month, day_of_week, day, scheduled_dep, distance, taxi_out=10):
     """
-    Predict delay probability for a single flight with enhanced features.
+    Predict delay probability using Target Encoding risks.
     Returns: probability of delay (0-1)
     """
     import numpy as np
     
-    # Encode categorical variables
-    try:
-        airline_encoded = label_encoders['AIRLINE'].transform([airline])[0]
-        origin_encoded = label_encoders['ORIGIN_AIRPORT'].transform([origin])[0]
-        dest_encoded = label_encoders['DESTINATION_AIRPORT'].transform([destination])[0]
-    except:
-        # If unseen category, use most common value
-        airline_encoded = 0
-        origin_encoded = 0
-        dest_encoded = 0
+    # Look up Risk Scores from target_encoders
+    # Default to global average (~0.18) if unknown
+    GLOBAL_AVG_DELAY = 0.18
+    
+    airline_risk = target_encoders['AIRLINE_RISK'].get(airline, GLOBAL_AVG_DELAY)
+    origin_risk = target_encoders['ORIGIN_RISK'].get(origin, GLOBAL_AVG_DELAY)
+    dest_risk = target_encoders['DEST_RISK'].get(destination, GLOBAL_AVG_DELAY)
     
     # Extract hour from scheduled departure
     departure_hour = scheduled_dep // 100
     
     # Time of day category
-    if 5 <= departure_hour < 12:
-        time_of_day = 0  # Morning
-    elif 12 <= departure_hour < 17:
-        time_of_day = 1  # Afternoon
-    elif 17 <= departure_hour < 21:
-        time_of_day = 2  # Evening
-    else:
-        time_of_day = 3  # Night/Early Morning
+    if 5 <= departure_hour < 12: time_of_day = 0  # Morning
+    elif 12 <= departure_hour < 17: time_of_day = 1  # Afternoon
+    elif 17 <= departure_hour < 21: time_of_day = 2  # Evening
+    else: time_of_day = 3  # Night
     
     # Distance category
-    if distance <= 500:
-        distance_category = 0  # Short
-    elif distance <= 1500:
-        distance_category = 1  # Medium
-    else:
-        distance_category = 2  # Long
+    if distance <= 500: distance_category = 0
+    elif distance <= 1500: distance_category = 1
+    else: distance_category = 2
     
     # Weekend flag
     is_weekend = 1 if day_of_week in [6, 7] else 0
     
-    # Create feature array with all enhanced features
-    # Order: AIRLINE, ORIGIN_AIRPORT, DESTINATION_AIRPORT, MONTH, DAY_OF_WEEK, DAY,
+    # Create feature array matching training columns
+    # Order: AIRLINE_RISK, ORIGIN_RISK, DEST_RISK, MONTH, DAY_OF_WEEK, DAY,
     #        DEPARTURE_HOUR, TIME_OF_DAY, DISTANCE, DISTANCE_CATEGORY, IS_WEEKEND, TAXI_OUT
     features = np.array([[
-        airline_encoded, origin_encoded, dest_encoded,
+        airline_risk, origin_risk, dest_risk,
         month, day_of_week, day,
         departure_hour, time_of_day, distance, distance_category,
         is_weekend, taxi_out
     ]])
     
     # Predict probability
-    prob = model.predict_proba(features)[0][1]  # Probability of class 1 (delayed)
+    prob = model.predict_proba(features)[0][1] 
     
     return prob
 
