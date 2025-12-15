@@ -478,6 +478,7 @@ with tab_delay:
         # Chart 1: Avg Airline & Aircraft Delay and Avg Air System Delay by Month (Stacked Bar)
         fig_c1 = px.bar(delay_means_month, x='Month', y=['Avg Airline & Aircraft Delay', 'Avg Air System Delay'],
                         title="Avg Airline & Aircraft Delay and Avg Air System Delay by Month",
+                        labels={"value": "Average Delay (min)", "variable": "Delay Category"},
                         color_discrete_map={'Avg Airline & Aircraft Delay': '#3b82f6', 'Avg Air System Delay': '#1e3a8a'})
         fig_c1 = update_chart_layout(fig_c1)
         fig_c1.update_layout(autosize=True, legend_title="", height=None)
@@ -488,7 +489,7 @@ with tab_delay:
         fig_c2 = px.bar(delay_means_month, x='Month', 
                         y=['WEATHER_DELAY', 'DEPARTURE_DELAY', 'ARRIVAL_DELAY', 'TAXI_OUT'],
                         title="Avg Weather, Dep, Arr, Taxi Out Delay by Month",
-                        labels={'WEATHER_DELAY': 'Avg Weather Delay', 'DEPARTURE_DELAY': 'Avg Departure Delay', 'ARRIVAL_DELAY': 'Avg Arrival Delay', 'TAXI_OUT': 'Avg Taxi Out Delay'},
+                        labels={'WEATHER_DELAY': 'Avg Weather Delay', 'DEPARTURE_DELAY': 'Avg Departure Delay', 'ARRIVAL_DELAY': 'Avg Arrival Delay', 'TAXI_OUT': 'Avg Taxi Out Delay', "value": "Average Delay (min)", "variable": "Delay Category"},
                         color_discrete_map={'WEATHER_DELAY': '#ef4444', 'DEPARTURE_DELAY': '#db2777', 'ARRIVAL_DELAY': '#f97316', 'TAXI_OUT': '#eab308'}
                         )
         fig_c2 = update_chart_layout(fig_c2)
@@ -514,7 +515,7 @@ with tab_delay:
     # Reverting to Area chart as requested
     fig_c3 = px.area(avg_delay_airline_month, x='Month', y='ARRIVAL_DELAY', color='AIRLINE_NAME',
                     title="Average Delay by Airline (Monthwise)",
-                    labels={'ARRIVAL_DELAY': 'Average Delay'},
+                    labels={'ARRIVAL_DELAY': 'Average Delay (min)'},
                     color_discrete_map=color_map)
     fig_c3.update_traces(line_shape='spline')
     fig_c3.update_traces(stackgroup=None, fill='tozeroy') 
@@ -943,10 +944,10 @@ with tab_ml:
             'Importance': importances
         }).sort_values('Importance', ascending=True)
         
-        fig_imp = px.bar(feature_importance_df, x='Importance', y='Feature', orientation='h', title="")
+        fig_imp = px.bar(feature_importance_df, x='Importance', y='Feature', orientation='h')
         fig_imp.update_traces(marker_color='#3b82f6')
         fig_imp = update_chart_layout(fig_imp)
-        fig_imp.update_layout(height=350, showlegend=False)
+        fig_imp.update_layout(height=350, showlegend=False, title_text="", margin=dict(t=0))
         
         st.plotly_chart(fig_imp, width="stretch", config=PLOTLY_CONFIG)
 
@@ -1067,14 +1068,6 @@ Parquet: 74 MB,  <1 second load time
         - Taxi-out correlation
         """)
     
-    st.markdown("""
-    **Model Validation Benefits**
-    - **Balanced Performance**: Optimized for F1-Score (Harmonic mean of Precision & Recall)
-    - **High Recall**: Prioritizes detecting delays (catching ~65% of all delays)
-    - **Smart Features**: "Risk Scores" allow the model to know the historical performance of every airline/airport, even those not in the training sample.
-    - **Efficient**: Model size compressed to <50MB for instant cloud loading.
-    """)
-    
     st.markdown("---")
     
     # Technology Stack
@@ -1132,8 +1125,7 @@ Parquet: 74 MB,  <1 second load time
     - Multiple visualization types (charts, gauges, heatmaps)
     - Airline and airport performance comparisons
     - Temporal pattern analysis
-    - ML-powered delay predictions
-    - Downloadable insights and metrics
+    - ML-powered delay prediction
     """)
     
     st.markdown("---")
