@@ -908,206 +908,194 @@ with tab_ml:
 
 # --- Tab: About ---
 with tab_about:
-    st.markdown("### The Journey: From Raw Data to Intelligent Predictions")
+    st.markdown("### Project Documentation")
     
     st.markdown("""
-    Every data science project tells a story. This is the story of how we transformed 5.8 million flight records 
-    into actionable insights and intelligent predictions that can help both airlines and passengers make better decisions.
+    This dashboard provides comprehensive analysis and machine learning predictions for flight delays 
+    using 2015 US domestic flight data.
     """)
     
     st.markdown("---")
     
-    # The Challenge
-    st.markdown("#### 🎯 The Challenge")
+    # Project Overview
+    st.markdown("#### :material/description: Project Overview")
+    
     st.markdown("""
-    Imagine you're planning a trip. You've booked your flight months in advance, packed your bags, and arrived at the airport 
-    with plenty of time to spare. Then you see it on the departure board: **DELAYED**. Sound familiar?
+    **Objective**: Analyze flight delay patterns and develop predictive models for delay probability
     
-    Flight delays are more than just an inconvenience—they cost airlines billions of dollars annually and affect millions 
-    of passengers. But what if we could predict which flights are likely to be delayed? What if airlines could proactively 
-    adjust their schedules, and passengers could make more informed booking decisions?
-    
-    That's exactly what we set out to do.
+    **Scope**: 
+    - Exploratory data analysis of delay patterns
+    - Performance comparison across airlines and airports
+    - Machine learning model for delay prediction
+    - Interactive visualization dashboard
     """)
     
     st.markdown("---")
     
-    # The Data
-    st.markdown("#### 📥 The Data")
-    
-    st.markdown("""
-    Our journey began with a massive dataset from the US Department of Transportation—**5.8 million domestic flight records** 
-    from 2015. This wasn't just numbers in a spreadsheet; it was a year's worth of real journeys, real delays, and real 
-    stories from travelers across America.
-    
-    The dataset came in a hefty **500 MB CSV file**, containing everything from departure times and airlines to weather delays 
-    and cancellation codes. It was comprehensive, but it was also unwieldy. Loading it took forever, and analyzing it felt 
-    like trying to drink from a fire hose.
-    """)
+    # Dataset Information
+    st.markdown("#### :material/bar_chart: Dataset Specifications")
     
     data_col1, data_col2 = st.columns(2)
     
     with data_col1:
-        st.info("""
-        **📊 The Numbers**  
-        5.8 Million flight records  
-        500 MB of raw data  
-        Full year of 2015  
-        Every major US airline
+        st.markdown("""
+        **Source & Scale**
+        - Source: [US Department of Transportation via Kaggle](https://www.kaggle.com/datasets/usdot/flight-delays)
+        - Records: 5.8 million flights
+        - Time Period: January to December 2015
+        - Coverage: All major US domestic carriers
+        - Original Format: CSV (500 MB)
+        - Optimized Format: Parquet (74 MB)
         """)
     
     with data_col2:
-        st.info("""
-        **🗂️ The Components**  
-        Flight schedules & delays  
-        Airline information  
-        Airport details  
-        Cancellation reasons
+        st.markdown("""
+        **Data Components**
+        - Flight schedules and actual times
+        - Delay information by category
+        - Cancellation data and reasons
+        - Airline reference information
+        - Airport operational details
         """)
     
     st.markdown("---")
     
-    # The Transformation
-    st.markdown("#### ⚙️ The Transformation")
+    # Technical Implementation
+    st.markdown("#### :material/settings: Technical Implementation")
     
     st.markdown("""
-    Here's where things got interesting. We faced our first major challenge: **the data was too slow to work with**. 
-    Every time we loaded the CSV file, we'd wait... and wait... and wait some more. This wasn't going to work for an 
-    interactive dashboard.
-    
-    So we got creative. We transformed the data from CSV to **Parquet format**—a columnar storage format designed for 
-    analytics. But we didn't stop there. We carefully analyzed which columns we actually needed, dropped the unnecessary 
-    ones, and optimized the data types. Think of it like packing for a trip: we kept what we needed and left the rest behind.
+    **Data Optimization**
+    - Converted CSV to Parquet format for 85% size reduction
+    - Implemented column-level compression (gzip)
+    - Optimized data types (Int32, category)
+    - Removed operationally irrelevant columns
+    - Result: Load time reduced from 30+ seconds to under 1 second
     """)
     
     st.code("""
-# Before: Slow and memory-hungry
-df = pd.read_csv('flights.csv')  # 500 MB, 30+ seconds to load
-
-# After: Fast and efficient
-df = pd.read_parquet('flights.parquet')  # 74 MB, loads in seconds!
-    """, language="python")
-    
-    st.markdown("**The result?** A dramatic transformation:")
+# Performance comparison
+CSV:     500 MB, 30+ second load time
+Parquet: 74 MB,  <1 second load time
+    """, language="text")
     
     result_metrics = st.columns(3)
     with result_metrics[0]:
-        st.metric("Original Size", "~500 MB", delta=None)
+        st.metric("Original Size", "500 MB")
     with result_metrics[1]:
         st.metric("Optimized Size", "74 MB", delta="-426 MB", delta_color="inverse")
     with result_metrics[2]:
-        st.metric("Size Reduction", "85%", delta=None)
-    
-    st.markdown("""
-    We didn't just make it smaller—we made it **85% smaller** while keeping all the information we needed. 
-    The dashboard now loads in seconds instead of minutes, making exploration feel effortless.
-    """)
+        st.metric("Reduction", "85%")
     
     st.markdown("---")
     
-    # The Discovery
-    st.markdown("#### 📊 The Discovery")
-    
-    st.markdown("""
-    With our data optimized, we dove into exploration. What patterns were hiding in those 5.8 million flights? 
-    
-    We discovered fascinating insights: certain airlines consistently outperformed others, some airports were delay hotspots, 
-    and delays followed clear temporal patterns—morning flights tended to be more punctual, while evening flights accumulated 
-    delays throughout the day like a snowball rolling downhill.
-    
-    Weather wasn't always the culprit we expected. While it caused its fair share of delays, **airline operations** and 
-    **air system issues** were often the real troublemakers. Each visualization in the other tabs tells part of this story, 
-    revealing the complex ecosystem of factors that influence whether your flight leaves on time.
-    """)
-    
-    st.markdown("---")
-    
-    # The Model
-    st.markdown("#### 🤖 The Intelligence")
-    
-    st.markdown("""
-    Armed with these insights, we built something powerful: a **machine learning model** that can predict whether a flight 
-    will be delayed before it even takes off.
-    
-    We chose a **Random Forest algorithm**—imagine a committee of 200 decision trees, each analyzing the flight from a 
-    different angle, then voting on the outcome. This ensemble approach makes the predictions robust and reliable.
-    
-    But what does the model actually look at? We engineered **12 carefully selected features** that capture the essence 
-    of a flight:
-    """)
+    # Machine Learning Model
+    st.markdown("#### :material/psychology: Machine Learning Model")
     
     model_col1, model_col2 = st.columns(2)
     
     with model_col1:
         st.markdown("""
-        **Who & Where**  
-        Which airline is operating the flight? Where is it departing from and going to? Different airlines have different 
-        track records, and some airport pairs are more challenging than others.
+        **Algorithm Configuration**
+        - Model: Random Forest Classifier
+        - Trees: 200 estimators
+        - Max Depth: 15 levels
+        - Features: 12 engineered variables
+        - Training Split: 80/20
+        - Class Balancing: Enabled
         """)
     
     with model_col2:
         st.markdown("""
-        **When & How**  
-        What time of day? What day of the week? Is it a weekend? Morning flights behave differently than evening flights. 
-        Weekend patterns differ from weekdays.
+        **Feature Categories**
+        - Carrier identification
+        - Origin and destination airports
+        - Temporal features (month, day, hour)
+        - Time-of-day categorization
+        - Distance and distance categories
+        - Weekend indicator
+        - Taxi-out duration
         """)
     
     st.markdown("""
-    **The Details**  
-    How far is the flight? How long does taxi-out typically take at this airport? These operational details matter more 
-    than you might think—a short taxi time suggests smooth operations, while a long one hints at congestion.
-    
-    The model learned from millions of examples, discovering patterns that even experienced airline operations managers 
-    might miss. It's not perfect—no model is—but it's remarkably good at identifying flights that are at risk of delay.
+    **Model Validation**
+    - Test Set: 1+ million held-out records
+    - Metrics: Accuracy, Precision, Recall, F1-Score
+    - Evaluation: Confusion matrix analysis
+    - Performance: Available in ML Prediction tab
     """)
     
     st.markdown("---")
     
-    # The Validation
-    st.markdown("#### ✅ The Validation")
+    # Technology Stack
+    st.markdown("#### :material/build: Technology Stack")
+    
+    tech_col1, tech_col2, tech_col3 = st.columns(3)
+    
+    with tech_col1:
+        st.markdown("""
+        **Frontend & UI**
+        - Streamlit
+        - Plotly Express
+        - Plotly Graph Objects
+        """)
+    
+    with tech_col2:
+        st.markdown("""
+        **Data Processing**
+        - Pandas
+        - NumPy
+        - Parquet/PyArrow
+        """)
+    
+    with tech_col3:
+        st.markdown("""
+        **Machine Learning**
+        - Scikit-learn
+        - Random Forest
+        - Label Encoding
+        """)
+    
+    st.markdown("---")
+    
+    # Key Findings
+    st.markdown("#### :material/search: Key Findings")
     
     st.markdown("""
-    Of course, we couldn't just build a model and call it a day. We needed to know: **does it actually work?**
-    
-    We held back 20% of our data—over a million flights—that the model had never seen before. This was our test: could 
-    the model predict delays for flights it knew nothing about?
-    
-    The answer was yes. The model demonstrated strong performance across multiple metrics, balancing the need to catch 
-    delays (recall) with the need to avoid false alarms (precision). You can see the live metrics in the ML Prediction 
-    tab, where the model's confusion matrix tells the full story of its predictions.
+    **Delay Patterns Identified**
+    - Morning flights show higher on-time performance
+    - Evening flights experience cumulative delays
+    - Significant carrier-to-carrier performance variation
+    - Specific airports identified as delay concentration points
+    - Weather delays represent smaller proportion than operational issues
+    - Taxi-out time correlates strongly with delay probability
     """)
     
     st.markdown("---")
     
-    # The Dashboard
-    st.markdown("#### 📢 The Dashboard")
+    # Dashboard Features
+    st.markdown("#### :material/dashboard: Dashboard Features")
     
     st.markdown("""
-    Finally, we brought it all together in this interactive dashboard. We didn't want the insights locked away in code 
-    or buried in static reports. We wanted them **alive, interactive, and accessible**.
-    
-    Built with Streamlit and Plotly, this dashboard lets you explore the data yourself, see the patterns we discovered, 
-    and even make your own delay predictions. It's designed to be intuitive—no data science degree required—while still 
-    providing the depth that analysts and aviation professionals need.
-    
-    Every chart is interactive. Every metric is real. Every prediction comes from the same model that learned from 
-    5.8 million flights. This is data science in action, not just in theory.
+    **Interactive Capabilities**
+    - Real-time data filtering and exploration
+    - Multiple visualization types (charts, gauges, heatmaps)
+    - Airline and airport performance comparisons
+    - Temporal pattern analysis
+    - ML-powered delay predictions
+    - Downloadable insights and metrics
     """)
     
     st.markdown("---")
     
-    # The Impact
+    # Project Summary
     st.markdown("""
-    <div style="background-color: #1a1c24; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 5px; margin-top: 20px;">
-        <h4 style="margin-top: 0;">💡 The Impact</h4>
-        <p style="font-size: 16px; line-height: 1.6;">
-        This project demonstrates what's possible when we combine domain knowledge, technical skill, and creative 
-        problem-solving. We took a massive, unwieldy dataset and transformed it into actionable intelligence. We built 
-        a model that can help airlines optimize operations and help passengers make smarter travel decisions.
-        </p>
+    <div style="background-color: #1a1c24; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 5px;">
+        <h4 style="margin-top: 0;">Project Summary</h4>
         <p style="font-size: 16px; line-height: 1.6; margin-bottom: 0;">
-        But more than that, we created a tool that tells a story—the story of millions of flights, thousands of delays, 
-        and the patterns that connect them all. Welcome to the journey.
+        This project demonstrates end-to-end data science workflow including data engineering, 
+        exploratory analysis, machine learning, and interactive visualization. The system processes 
+        5.8 million flight records to provide actionable insights for airline operations and passenger 
+        decision-making through an accessible web-based interface.
         </p>
     </div>
     """, unsafe_allow_html=True)

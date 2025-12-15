@@ -23,6 +23,12 @@ pip install -r requirements.txt
 
 ## Data Setup
 
+### Data Source
+
+The dataset contains 5.8 million US domestic flight records from 2015, sourced from the [US Department of Transportation via Kaggle](https://www.kaggle.com/datasets/usdot/flight-delays).
+
+### Data Format
+
 The dashboard uses optimized Parquet format for fast loading:
 
 - **Original**: ~500MB CSV file
@@ -77,7 +83,7 @@ The dashboard will open in your browser at `http://localhost:8501`
 This project demonstrates a complete data science workflow:
 
 1. **Problem Definition**: Predict flight delay probability
-2. **Data Collection**: 5.8M flight records from 2015
+2. **Data Collection**: 5.8M flight records from [US DOT via Kaggle](https://www.kaggle.com/datasets/usdot/flight-delays)
 3. **Data Preprocessing**: CSV to Parquet optimization, data cleaning
 4. **EDA**: Interactive visualizations across multiple dimensions
 5. **Modeling**: Random Forest classifier with 8 features
