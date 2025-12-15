@@ -67,11 +67,28 @@ def prepare_data(flights):
         'DEST_RISK': dest_risk.to_dict()
     }
 
-    # Now downsample for training speed/size
-    TARGET_SIZE = 250000
-    if len(ml_df) > TARGET_SIZE:
-        print(f"Downsampling data to {TARGET_SIZE:,} for training...")
-        ml_df = ml_df.sample(n=TARGET_SIZE, random_state=42)
+    # --- BALANCED DOWNSAMPLING FOR MAX F1 SCORE ---
+    # To get high F1, we need to show the model equal examples of both classes.
+    # We will create a 50/50 dataset: 125k Delayed + 125k On-Time.
+    TARGET_SIZE_PER_CLASS = 125000
+    
+    df_delayed = ml_df[ml_df['DELAYED'] == 1]
+    df_ontime = ml_df[ml_df['DELAYED'] == 0]
+    
+    print(f"Available Delays: {len(df_delayed):,}")
+    print(f"Available On-Time: {len(df_ontime):,}")
+    
+    if len(df_delayed) >= TARGET_SIZE_PER_CLASS and len(df_ontime) >= TARGET_SIZE_PER_CLASS:
+        print(f"Creating balanced dataset: {TARGET_SIZE_PER_CLASS:,} of each class...")
+        df_delayed = df_delayed.sample(n=TARGET_SIZE_PER_CLASS, random_state=42)
+        df_ontime = df_ontime.sample(n=TARGET_SIZE_PER_CLASS, random_state=42)
+        ml_df = pd.concat([df_delayed, df_ontime])
+        # Shuffle
+        ml_df = ml_df.sample(frac=1, random_state=42).reset_index(drop=True)
+    else:
+        # Fallback if not enough data (unlikely)
+        print("Not enough data for balanced target, using random sample...")
+        ml_df = ml_df.sample(n=TARGET_SIZE_PER_CLASS*2, random_state=42)
     
     # Enhanced feature engineering
     ml_df['DEPARTURE_HOUR'] = (ml_df['SCHEDULED_DEPARTURE'] // 100).astype(int)
@@ -120,18 +137,16 @@ def train_model(X, y):
     print(f"Test set: {len(X_test):,} samples")
     
     print("\nTraining improved Random Forest model...")
-    # Using 'balanced' forces the model to prioritize the minority class (delays),
-    # which hurts accuracy (lots of false positives).
-    # We relax this slightly to {0:1, 1:3} to boost accuracy while still caring about delays.
+    # Balanced data = No need for class_weight
     model = RandomForestClassifier(
-        n_estimators=150,          # Increased slightly for better stability
-        max_depth=14,              # Increased slightly for better learning
+        n_estimators=150,
+        max_depth=14,
         min_samples_split=50,      
         min_samples_leaf=20,       
         max_features='sqrt',       
         random_state=42,
         n_jobs=-1,
-        class_weight={0:1, 1:3},   # Hand-tuned weight to improve accuracy vs 'balanced'
+        # class_weight='balanced', # REMOVED: Data is already 50/50 corrected
         bootstrap=True,
         oob_score=True,           
         verbose=1
@@ -146,13 +161,16 @@ def train_model(X, y):
 def evaluate_model(model, X_test, y_test):
     """Evaluate model performance."""
     print("\nEvaluating model...")
+    from sklearn.metrics import roc_auc_score
     
     y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
     
     accuracy = accuracy_score(y_test, y_pred)
     precision = precision_score(y_test, y_pred)
     recall = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
+    roc_auc = roc_auc_score(y_test, y_prob)
     cm = confusion_matrix(y_test, y_pred)
     
     print("\n" + "="*50)
@@ -162,6 +180,7 @@ def evaluate_model(model, X_test, y_test):
     print(f"Precision: {precision:.4f} ({precision*100:.2f}%)")
     print(f"Recall:    {recall:.4f} ({recall*100:.2f}%)")
     print(f"F1-Score:  {f1:.4f} ({f1*100:.2f}%)")
+    print(f"ROC-AUC:   {roc_auc:.4f}")
     print("\nConfusion Matrix:")
     print(f"  True Negatives:  {cm[0][0]:,}")
     print(f"  False Positives: {cm[0][1]:,}")
@@ -174,6 +193,7 @@ def evaluate_model(model, X_test, y_test):
         'precision': precision,
         'recall': recall,
         'f1': f1,
+        'roc_auc': roc_auc,
         'confusion_matrix': cm
     }
     

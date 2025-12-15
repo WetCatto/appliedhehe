@@ -745,9 +745,9 @@ with tab_ml:
     st.markdown("### Machine Learning: Flight Delay Prediction")
     
     # Try to load pre-trained model first
-    from utils import load_trained_model, prepare_ml_data, train_delay_model, get_model_metrics, predict_delay_probability
+    from utils import load_trained_model_v2, prepare_ml_data, train_delay_model, get_model_metrics, predict_delay_probability
     
-    model_data = load_trained_model()
+    model_data = load_trained_model_v2()
     
     if model_data is not None:
         # Use pre-trained model
@@ -883,9 +883,10 @@ with tab_ml:
     st.markdown("---")
     
     # Display Model Performance
+    # Display Model Performance
     st.markdown("#### :material/analytics: Model Performance")
     
-    perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
+    perf_col1, perf_col2, perf_col3, perf_col4, perf_col5 = st.columns(5)
     
     with perf_col1:
         st.metric("Accuracy", f"{ml_metrics['accuracy']:.2%}")
@@ -895,6 +896,10 @@ with tab_ml:
         st.metric("Recall", f"{ml_metrics['recall']:.2%}")
     with perf_col4:
         st.metric("F1-Score", f"{ml_metrics['f1']:.2%}")
+    with perf_col5:
+        # Default to 0 if key doesn't exist yet (backward compatibility)
+        roc_auc = ml_metrics.get('roc_auc', 0)
+        st.metric("ROC-AUC", f"{roc_auc:.4f}")
     
     st.markdown("---")
     
@@ -938,7 +943,7 @@ with tab_ml:
             'Importance': importances
         }).sort_values('Importance', ascending=True)
         
-        fig_imp = px.bar(feature_importance_df, x='Importance', y='Feature', orientation='h')
+        fig_imp = px.bar(feature_importance_df, x='Importance', y='Feature', orientation='h', title="")
         fig_imp.update_traces(marker_color='#3b82f6')
         fig_imp = update_chart_layout(fig_imp)
         fig_imp.update_layout(height=350, showlegend=False)
@@ -1046,31 +1051,28 @@ Parquet: 74 MB,  <1 second load time
         st.markdown("""
         **Algorithm Configuration**
         - Model: Random Forest Classifier
-        - Trees: 200 estimators
-        - Max Depth: 15 levels
-        - Features: 12 engineered variables
-        - Training Split: 80/20
-        - Class Balancing: Enabled
+        - Architecture: 150 estimators, Max Depth 14
+        - Training Strategy: **Balanced Downsampling** (50% Delayed / 50% On-Time)
+        - Dataset: 250,000 records (sampled from 5.8M)
+        - Class Imbalance: Handled via Undersampling
         """)
     
     with model_col2:
         st.markdown("""
-        **Feature Categories**
-        - Carrier identification
-        - Origin and destination airports
-        - Temporal features (month, day, hour)
-        - Time-of-day categorization
-        - Distance and distance categories
-        - Weekend indicator
-        - Taxi-out duration
+        **Feature Engineering**
+        - **Target Encoding**: Implicit Risk Scores for Airline, Origin, & Destination (based on full 5.8M dataset)
+        - Temporal features: Time-of-Day categorization
+        - Distance binning
+        - Weekend impact analysis
+        - Taxi-out correlation
         """)
     
     st.markdown("""
-    **Model Validation**
-    - Test Set: 1+ million held-out records
-    - Metrics: Accuracy, Precision, Recall, F1-Score
-    - Evaluation: Confusion matrix analysis
-    - Performance: Available in ML Prediction tab
+    **Model Validation Benefits**
+    - **Balanced Performance**: Optimized for F1-Score (Harmonic mean of Precision & Recall)
+    - **High Recall**: Prioritizes detecting delays (catching ~65% of all delays)
+    - **Smart Features**: "Risk Scores" allow the model to know the historical performance of every airline/airport, even those not in the training sample.
+    - **Efficient**: Model size compressed to <50MB for instant cloud loading.
     """)
     
     st.markdown("---")
@@ -1101,7 +1103,7 @@ Parquet: 74 MB,  <1 second load time
         **Machine Learning**
         - Scikit-learn
         - Random Forest
-        - Label Encoding
+        - Target Encoding
         """)
     
     st.markdown("---")

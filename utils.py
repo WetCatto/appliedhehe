@@ -288,10 +288,21 @@ def prepare_ml_data(_flights):
         'DEST_RISK': dest_risk.to_dict()
     }
 
-    # Sample data to reduce model size / training time
-    TARGET_SIZE = 250000
-    if len(ml_df) > TARGET_SIZE:
-        ml_df = ml_df.sample(n=TARGET_SIZE, random_state=42)
+    # --- BALANCED DOWNSAMPLING FOR MAX F1 SCORE ---
+    TARGET_SIZE_PER_CLASS = 125000
+    
+    df_delayed = ml_df[ml_df['DELAYED'] == 1]
+    df_ontime = ml_df[ml_df['DELAYED'] == 0]
+    
+    if len(df_delayed) >= TARGET_SIZE_PER_CLASS and len(df_ontime) >= TARGET_SIZE_PER_CLASS:
+        df_delayed = df_delayed.sample(n=TARGET_SIZE_PER_CLASS, random_state=42)
+        df_ontime = df_ontime.sample(n=TARGET_SIZE_PER_CLASS, random_state=42)
+        ml_df = pd.concat([df_delayed, df_ontime])
+        # Shuffle
+        ml_df = ml_df.sample(frac=1, random_state=42).reset_index(drop=True)
+    else:
+        # Fallback
+        ml_df = ml_df.sample(n=TARGET_SIZE_PER_CLASS*2, random_state=42)
     
     # Enhanced feature engineering
     ml_df['DEPARTURE_HOUR'] = (ml_df['SCHEDULED_DEPARTURE'] // 100).astype(int)
@@ -339,14 +350,14 @@ def train_delay_model(_X_train, _y_train):
     
     # Train Random Forest with improved parameters for better performance
     model = RandomForestClassifier(
-        n_estimators=150,          # Increased slightly
-        max_depth=14,              # Increased slightly
+        n_estimators=150,
+        max_depth=14,
         min_samples_split=50,
         min_samples_leaf=20,
         max_features='sqrt',
         random_state=42,
         n_jobs=-1,
-        class_weight={0:1, 1:3},   # Balanced accuracy/recall trade-off
+        # class_weight='balanced', # REMOVED: Data is already 50/50 corrected
         bootstrap=True,
         oob_score=True
     )
@@ -359,17 +370,19 @@ def train_delay_model(_X_train, _y_train):
 def get_model_metrics(_model, _X_test, _y_test):
     """
     Calculate model evaluation metrics.
-    Returns: dict with accuracy, precision, recall, f1, confusion_matrix
+    Returns: dict with accuracy, precision, recall, f1, confusion_matrix, roc_auc
     """
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
     
     y_pred = _model.predict(_X_test)
+    y_prob = _model.predict_proba(_X_test)[:, 1]
     
     metrics = {
         'accuracy': accuracy_score(_y_test, y_pred),
         'precision': precision_score(_y_test, y_pred),
         'recall': recall_score(_y_test, y_pred),
         'f1': f1_score(_y_test, y_pred),
+        'roc_auc': roc_auc_score(_y_test, y_prob),
         'confusion_matrix': confusion_matrix(_y_test, y_pred)
     }
     
@@ -426,7 +439,7 @@ def predict_delay_probability(model, target_encoders, airline, origin, destinati
 
 
 @st.cache_resource
-def load_trained_model():
+def load_trained_model_v2():
     """
     Load pre-trained model from disk.
     If model file doesn't exist, returns None and app will train on-the-fly.
@@ -437,6 +450,9 @@ def load_trained_model():
     import os
     
     model_path = 'flight_delay_model.pkl'
+    
+    # Print to logs to verify loading (and bust cache)
+    print("Loading optimized flight delay model...")
     
     if os.path.exists(model_path):
         try:
