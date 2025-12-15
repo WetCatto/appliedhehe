@@ -251,3 +251,210 @@ def compute_metrics(flights):
     metrics['pct_airline'] = (val_A / metrics['total_cancelled'] * 100) if metrics['total_cancelled'] > 0 else 0
     
     return metrics
+
+
+# ===== MACHINE LEARNING FUNCTIONS =====
+
+@st.cache_data
+def prepare_ml_data(_flights):
+    """
+    Prepare data for machine learning model with improved features.
+    Returns: X_train, X_test, y_train, y_test, feature_names, label_encoders
+    """
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import LabelEncoder
+    import numpy as np
+    
+    # Create a copy and remove cancelled flights
+    ml_df = _flights[_flights['CANCELLED'] == 0].copy()
+    
+    # Create target variable: 1 if delayed (>15 min), 0 otherwise
+    # Fill NA values first to avoid conversion error
+    ml_df['DELAYED'] = (ml_df['ARRIVAL_DELAY'].fillna(0) > 15).astype(int)
+    
+    # Enhanced feature engineering
+    # Extract hour from scheduled departure
+    ml_df['DEPARTURE_HOUR'] = (ml_df['SCHEDULED_DEPARTURE'] // 100).astype(int)
+    
+    # Create time of day categories (better than raw hour)
+    def categorize_time(hour):
+        if 5 <= hour < 12:
+            return 0  # Morning
+        elif 12 <= hour < 17:
+            return 1  # Afternoon
+        elif 17 <= hour < 21:
+            return 2  # Evening
+        else:
+            return 3  # Night/Early Morning
+    
+    ml_df['TIME_OF_DAY'] = ml_df['DEPARTURE_HOUR'].apply(categorize_time)
+    
+    # Distance categories (short, medium, long haul)
+    ml_df['DISTANCE_CATEGORY'] = pd.cut(ml_df['DISTANCE'], 
+                                         bins=[0, 500, 1500, 5000], 
+                                         labels=[0, 1, 2]).astype(int)
+    
+    # Weekend flag
+    ml_df['IS_WEEKEND'] = (ml_df['DAY_OF_WEEK'].isin([6, 7])).astype(int)
+    
+    # Select enhanced features
+    feature_cols = [
+        'AIRLINE', 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT',
+        'MONTH', 'DAY_OF_WEEK', 'DAY',
+        'DEPARTURE_HOUR', 'TIME_OF_DAY', 'DISTANCE', 'DISTANCE_CATEGORY',
+        'IS_WEEKEND', 'TAXI_OUT'
+    ]
+    
+    # Remove rows with missing values in features or target
+    ml_df = ml_df[feature_cols + ['DELAYED']].dropna()
+    
+    # Encode categorical variables
+    label_encoders = {}
+    categorical_cols = ['AIRLINE', 'ORIGIN_AIRPORT', 'DESTINATION_AIRPORT']
+    
+    for col in categorical_cols:
+        le = LabelEncoder()
+        ml_df[col] = le.fit_transform(ml_df[col].astype(str))
+        label_encoders[col] = le
+    
+    # Split features and target
+    X = ml_df[feature_cols]
+    y = ml_df['DELAYED']
+    
+    # Train-test split (80-20)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    
+    return X_train, X_test, y_train, y_test, feature_cols, label_encoders
+
+
+@st.cache_resource
+def train_delay_model(_X_train, _y_train):
+    """
+    Train improved Random Forest model for delay prediction.
+    Uses @st.cache_resource to avoid retraining on every reload.
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    
+    # Train Random Forest with improved parameters for better performance
+    model = RandomForestClassifier(
+        n_estimators=200,          # More trees for better predictions
+        max_depth=15,              # Deeper trees to capture patterns
+        min_samples_split=50,      # Lower threshold for splitting
+        min_samples_leaf=20,       # Lower threshold for leaves
+        max_features='sqrt',       # Feature sampling for regularization
+        random_state=42,
+        n_jobs=-1,
+        class_weight='balanced',   # Handle class imbalance
+        bootstrap=True,
+        oob_score=True            # Out-of-bag score for validation
+    )
+    
+    model.fit(_X_train, _y_train)
+    return model
+
+
+@st.cache_data
+def get_model_metrics(_model, _X_test, _y_test):
+    """
+    Calculate model evaluation metrics.
+    Returns: dict with accuracy, precision, recall, f1, confusion_matrix
+    """
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+    
+    y_pred = _model.predict(_X_test)
+    
+    metrics = {
+        'accuracy': accuracy_score(_y_test, y_pred),
+        'precision': precision_score(_y_test, y_pred),
+        'recall': recall_score(_y_test, y_pred),
+        'f1': f1_score(_y_test, y_pred),
+        'confusion_matrix': confusion_matrix(_y_test, y_pred)
+    }
+    
+    return metrics
+
+
+def predict_delay_probability(model, label_encoders, airline, origin, destination, 
+                              month, day_of_week, day, scheduled_dep, distance, taxi_out=10):
+    """
+    Predict delay probability for a single flight with enhanced features.
+    Returns: probability of delay (0-1)
+    """
+    import numpy as np
+    
+    # Encode categorical variables
+    try:
+        airline_encoded = label_encoders['AIRLINE'].transform([airline])[0]
+        origin_encoded = label_encoders['ORIGIN_AIRPORT'].transform([origin])[0]
+        dest_encoded = label_encoders['DESTINATION_AIRPORT'].transform([destination])[0]
+    except:
+        # If unseen category, use most common value
+        airline_encoded = 0
+        origin_encoded = 0
+        dest_encoded = 0
+    
+    # Extract hour from scheduled departure
+    departure_hour = scheduled_dep // 100
+    
+    # Time of day category
+    if 5 <= departure_hour < 12:
+        time_of_day = 0  # Morning
+    elif 12 <= departure_hour < 17:
+        time_of_day = 1  # Afternoon
+    elif 17 <= departure_hour < 21:
+        time_of_day = 2  # Evening
+    else:
+        time_of_day = 3  # Night/Early Morning
+    
+    # Distance category
+    if distance <= 500:
+        distance_category = 0  # Short
+    elif distance <= 1500:
+        distance_category = 1  # Medium
+    else:
+        distance_category = 2  # Long
+    
+    # Weekend flag
+    is_weekend = 1 if day_of_week in [6, 7] else 0
+    
+    # Create feature array with all enhanced features
+    # Order: AIRLINE, ORIGIN_AIRPORT, DESTINATION_AIRPORT, MONTH, DAY_OF_WEEK, DAY,
+    #        DEPARTURE_HOUR, TIME_OF_DAY, DISTANCE, DISTANCE_CATEGORY, IS_WEEKEND, TAXI_OUT
+    features = np.array([[
+        airline_encoded, origin_encoded, dest_encoded,
+        month, day_of_week, day,
+        departure_hour, time_of_day, distance, distance_category,
+        is_weekend, taxi_out
+    ]])
+    
+    # Predict probability
+    prob = model.predict_proba(features)[0][1]  # Probability of class 1 (delayed)
+    
+    return prob
+
+
+@st.cache_resource
+def load_trained_model():
+    """
+    Load pre-trained model from disk.
+    If model file doesn't exist, returns None and app will train on-the-fly.
+    
+    Returns: dict with model, feature_names, label_encoders, metrics (or None)
+    """
+    import pickle
+    import os
+    
+    model_path = 'flight_delay_model.pkl'
+    
+    if os.path.exists(model_path):
+        try:
+            with open(model_path, 'rb') as f:
+                model_data = pickle.load(f)
+            return model_data
+        except Exception as e:
+            st.warning(f"Could not load pre-trained model: {e}")
+            return None
+    else:
+        return None

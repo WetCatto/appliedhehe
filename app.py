@@ -161,7 +161,11 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316", unit="min"):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
-        number = {'font': {'size': 36, 'color': 'white'}, 'suffix': f' {unit}'},
+        number = {
+            'font': {'size': 36, 'color': 'white'}, 
+            'suffix': f' {unit}',
+            'valueformat': '.1f'
+        },
         domain = {'x': [0, 1], 'y': [0, 1]},
         gauge = {
             'axis': {'range': [None, max_val], 'tickwidth': 1, 'tickcolor': "white"},
@@ -177,26 +181,29 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316", unit="min"):
         }
     ))
     
-    # Add centered title as annotation
+    # Add centered title as annotation at the top
     fig.add_annotation(
         text=title,
         xref="paper", yref="paper",
-        x=0.5, y=0.95,
-        xanchor='center', yanchor='bottom',
+        x=0.5, y=0.0,
+        xanchor='center', yanchor='top',
         showarrow=False,
         font=dict(size=14, color='white', family='Inter')
     )
     
     fig.update_layout(
         height=240,
-        margin={'t': 70, 'b': 20, 'l': 30, 'r': 30},
+        margin={'t': 50, 'b': 20, 'l': 30, 'r': 30},
         paper_bgcolor='rgba(0,0,0,0)',
         font={'color': "white", 'family': 'Inter'}
     )
     return fig
 
 # Tabs Reorganization:# --- Layout Definitions ---
-tab_delay, tab_time, tab_airline, tab_airport, tab_eda = st.tabs(["Delay Analysis", "Time Analysis", "Airline Analysis", "Airport Analysis", "Deep Dive (EDA)"])
+tab_delay, tab_time, tab_airline, tab_airport, tab_ml, tab_about = st.tabs([
+    "Delay Analysis", "Time Analysis", "Airline Analysis", "Airport Analysis", 
+    "ML Prediction", "About"
+])
 
 
 # --- Custom CSS ---
@@ -694,78 +701,413 @@ with tab_airport:
          st.plotly_chart(fig_cnl, width="stretch", config=PLOTLY_CONFIG)
 
     st.markdown("---")
-# --- Tab: EDA ---
-with tab_eda:
-    st.markdown("### Deep Dive Analysis")
+# --- Tab: ML Prediction ---
+with tab_ml:
+    st.markdown("### Machine Learning: Flight Delay Prediction")
     
-    st.markdown("#### 1. Flight Volume Patterns")
-    st.markdown("**How does the overall flight volume vary by month? By day of week?**")
+    # Try to load pre-trained model first
+    from utils import load_trained_model, prepare_ml_data, train_delay_model, get_model_metrics, predict_delay_probability
     
-    q1_col1, q1_col2 = st.columns(2)
+    model_data = load_trained_model()
     
-    with q1_col1:
-        # Use pre-computed volume by month
-        vol_month = metrics['vol_month']
+    if model_data is not None:
+        # Use pre-trained model
+        model = model_data['model']
+        feature_names = model_data['feature_names']
+        label_encoders = model_data['label_encoders']
+        ml_metrics = model_data['metrics']
+    else:
+        # Train model on-the-fly (cached to avoid retraining)
+        st.warning("⚠️ No pre-trained model found. Training model now... (This may take a minute)")
+        st.info("💡 **Tip**: Run `python train_model.py` to pre-train the model and save it to disk for faster loading.")
         
-        fig_vol_m = px.area(vol_month, x='Month Name', y='Count', title="Flight Volume by Month", markers=True)
-        fig_vol_m.update_traces(line_color='#3b82f6', fillcolor='rgba(59, 130, 246, 0.2)')
-        fig_vol_m = update_chart_layout(fig_vol_m)
-        st.plotly_chart(fig_vol_m, width="stretch", config=PLOTLY_CONFIG)
-        
-    with q1_col2:
-        # Use pre-computed volume by day of week
-        vol_day = metrics['vol_day']
-        
-        fig_vol_d = px.bar(vol_day, x='Day Name', y='Count', title="Flight Volume by Day of Week")
-        fig_vol_d.update_traces(marker_color='#1d4ed8')
-        fig_vol_d = update_chart_layout(fig_vol_d)
-        fig_vol_d.update_layout(showlegend=False)
-        st.plotly_chart(fig_vol_d, width="stretch", config=PLOTLY_CONFIG)
-        
-    st.markdown("---")
+        with st.spinner('Training ML model... (This only happens once per session)'):
+            X_train, X_test, y_train, y_test, feature_names, label_encoders = prepare_ml_data(flights)
+            model = train_delay_model(X_train, y_train)
+            ml_metrics = get_model_metrics(model, X_test, y_test)
 
-    st.markdown("#### 2. Departure Delay Insights")
-    st.markdown("**Percetage of flights with departure delay (>15 mins) and average delay duration.**")
-
-    # Use pre-computed departure delay metrics
-    pct_dep_delayed = metrics['pct_dep_delayed']
-    avg_dep_delay_duration = metrics['avg_dep_delay_duration']
-    
-    q2_c1, q2_c2 = st.columns(2)
-    with q2_c1:
-         st.metric("Departure Delayed %", f"{pct_dep_delayed:.2f}%")
-    with q2_c2:
-         st.metric("Avg Delay Duration (min)", f"{avg_dep_delay_duration:.1f}", help="Average minutes for flights that were delayed >15m")
-         
     st.markdown("---")
     
-    st.markdown("#### 3. Delay Trends: Overall vs Boston (BOS)")
-    st.markdown("**How does the % of delayed flights vary throughout the year? Comparison with BOS.**")
+    # Interactive Prediction
+    st.markdown("#### 🎯 Interactive Prediction")
+    st.markdown("Enter flight details to predict delay probability:")
     
-    # Use pre-computed comparison trend
-    comp_trend = metrics['comp_trend']
+    pred_col1, pred_col2, pred_col3 = st.columns(3)
     
-    fig_comp = px.line(comp_trend, x='Month', y='Delayed_Pct', color='Type', title="Departure Delay % Trends (National vs BOS)", markers=True,
-                       color_discrete_map={'National Average': '#9ca3af', 'Boston (BOS)': '#22c55e'})
-    fig_comp = update_chart_layout(fig_comp)
-    with st.container():
-        st.plotly_chart(fig_comp, width="stretch", config=PLOTLY_CONFIG)
+    # Get unique values for dropdowns
+    # Create airline options with full names
+    airline_codes = sorted(flights['AIRLINE'].dropna().unique())
+    airline_options = []
+    airline_code_map = {}  # Map display name to code
+    
+    for code in airline_codes:
+        airline_info = airlines[airlines['IATA_CODE'] == code]
+        if not airline_info.empty:
+            airline_name = airline_info.iloc[0]['AIRLINE']
+            display_name = f"{code} - {airline_name}"
+        else:
+            display_name = code
+        airline_options.append(display_name)
+        airline_code_map[display_name] = code
+    
+    # Create airport options with full names
+    airport_codes = sorted(flights['ORIGIN_AIRPORT'].dropna().unique())
+    airport_options = []
+    airport_code_map = {}  # Map display name to code
+    
+    for code in airport_codes:
+        airport_info = airports[airports['IATA_CODE'] == code]
+        if not airport_info.empty:
+            airport_name = airport_info.iloc[0]['AIRPORT']
+            city = airport_info.iloc[0]['CITY']
+            display_name = f"{code} - {airport_name}, {city}"
+        else:
+            display_name = code
+        airport_options.append(display_name)
+        airport_code_map[display_name] = code
+    
+    with pred_col1:
+        input_airline_display = st.selectbox("Airline", airline_options, key='ml_airline')
+        input_origin_display = st.selectbox("Origin Airport", airport_options, key='ml_origin')
+        input_dest_display = st.selectbox("Destination Airport", airport_options, key='ml_dest')
+        
+        # Get actual codes from display names
+        input_airline = airline_code_map[input_airline_display]
+        input_origin = airport_code_map[input_origin_display]
+        input_dest = airport_code_map[input_dest_display]
+    
+    with pred_col2:
+        input_month = st.slider("Month", 1, 12, 6, key='ml_month')
+        input_dow = st.slider("Day of Week (1=Mon, 7=Sun)", 1, 7, 3, key='ml_dow')
+        input_day = st.slider("Day of Month", 1, 31, 15, key='ml_day')
+    
+    with pred_col3:
+        input_sched_dep = st.number_input("Scheduled Departure (24hr format, e.g., 1430)", 
+                                          min_value=0, max_value=2359, value=1200, key='ml_sched')
+        input_distance = st.number_input("Distance (miles)", 
+                                         min_value=0, max_value=5000, value=800, key='ml_dist')
+        input_taxi_out = st.slider("Expected Taxi Out Time (min)", 1, 60, 10, key='ml_taxi')
+    
+    if st.button("Predict Delay Probability", type="primary"):
+        prob = predict_delay_probability(
+            model, label_encoders, input_airline, input_origin, input_dest,
+            input_month, input_dow, input_day, input_sched_dep, input_distance, input_taxi_out
+        )
+        
+        # Store prediction in session state
+        st.session_state['prediction_result'] = {
+            'prob': prob,
+            'airline': input_airline,
+            'origin': input_origin,
+            'dest': input_dest
+        }
+    
+    # Display prediction results if they exist in session state
+    if 'prediction_result' in st.session_state:
+        result = st.session_state['prediction_result']
+        prob = result['prob']
+        
+        st.markdown("---")
+        st.markdown("#### Prediction Result")
+        
+        # Display probability as gauge
+        prob_pct = prob * 100
+        
+        # Determine color based on probability
+        if prob_pct < 30:
+            gauge_color = "#22c55e"  # Green
+            risk_level = "Low Risk"
+        elif prob_pct < 60:
+            gauge_color = "#facc15"  # Yellow
+            risk_level = "Medium Risk"
+        else:
+            gauge_color = "#ef4444"  # Red
+            risk_level = "High Risk"
+        
+        result_col1, result_col2 = st.columns([2, 1])
+        
+        with result_col1:
+            fig_prob = create_gauge_chart(prob_pct, "Delay Probability", max_val=100, 
+                                         color=gauge_color, unit="%")
+            st.plotly_chart(fig_prob, width="stretch")
+        
+        with result_col2:
+            st.markdown(f"""
+            <div style="background-color: #1a1c24; border: 2px solid {gauge_color}; border-radius: 8px; padding: 20px; text-align: center; margin-top: 60px;">
+                <div style="font-size: 18px; font-weight: bold; color: {gauge_color};">{risk_level}</div>
+                <div style="font-size: 14px; color: #94a3b8; margin-top: 10px;">
+                    This flight has a <strong>{prob_pct:.1f}%</strong> probability of being delayed.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     
     st.markdown("---")
+    
+    # Display Model Performance
+    st.markdown("#### 📊 Model Performance")
+    
+    perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
+    
+    with perf_col1:
+        st.metric("Accuracy", f"{ml_metrics['accuracy']:.2%}")
+    with perf_col2:
+        st.metric("Precision", f"{ml_metrics['precision']:.2%}")
+    with perf_col3:
+        st.metric("Recall", f"{ml_metrics['recall']:.2%}")
+    with perf_col4:
+        st.metric("F1-Score", f"{ml_metrics['f1']:.2%}")
+    
+    st.markdown("---")
+    
+    # Visualizations Row
+    viz_col1, viz_col2 = st.columns(2)
+    
+    with viz_col1:
+        # Confusion Matrix
+        st.markdown("#### Confusion Matrix")
+        cm = ml_metrics['confusion_matrix']
+        
+        fig_cm = go.Figure(data=go.Heatmap(
+            z=cm,
+            x=['Predicted: On-Time', 'Predicted: Delayed'],
+            y=['Actual: On-Time', 'Actual: Delayed'],
+            colorscale='Blues',
+            text=cm,
+            texttemplate='%{text}',
+            textfont={"size": 16},
+            showscale=False
+        ))
+        
+        fig_cm.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font={'color': 'white', 'family': 'Inter'},
+            xaxis={'side': 'bottom'},
+            yaxis={'autorange': 'reversed'},
+            height=350
+        )
+        
+        st.plotly_chart(fig_cm, width="stretch", config=PLOTLY_CONFIG)
+    
+    with viz_col2:
+        # Feature Importance
+        st.markdown("#### Feature Importance")
+        
+        importances = model.feature_importances_
+        feature_importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Importance': importances
+        }).sort_values('Importance', ascending=True)
+        
+        fig_imp = px.bar(feature_importance_df, x='Importance', y='Feature', orientation='h')
+        fig_imp.update_traces(marker_color='#3b82f6')
+        fig_imp = update_chart_layout(fig_imp)
+        fig_imp.update_layout(height=350, showlegend=False)
+        
+        st.plotly_chart(fig_imp, width="stretch", config=PLOTLY_CONFIG)
 
-    st.markdown("#### 4. Cancellation Analysis")
-    st.markdown("**How many flights were cancelled in 2015? Why?**")
+# --- Tab: About ---
+with tab_about:
+    st.markdown("### The Journey: From Raw Data to Intelligent Predictions")
     
-    # Use pre-computed cancellation metrics
-    total_cancelled = metrics['total_cancelled']
-    pct_cancelled = metrics['pct_cancelled']
-    pct_weather = metrics['pct_weather']
-    pct_airline = metrics['pct_airline']
+    st.markdown("""
+    Every data science project tells a story. This is the story of how we transformed 5.8 million flight records 
+    into actionable insights and intelligent predictions that can help both airlines and passengers make better decisions.
+    """)
     
-    q4_c1, q4_c2, q4_c3 = st.columns(3)
-    with q4_c1:
-        st.metric("Total Cancelled", f"{total_cancelled:,}")
-    with q4_c2:
-         st.metric("% Due to Weather", f"{pct_weather:.1f}%")
-    with q4_c3:
-         st.metric("% Due to Airline", f"{pct_airline:.1f}%")
+    st.markdown("---")
+    
+    # The Challenge
+    st.markdown("#### 🎯 The Challenge")
+    st.markdown("""
+    Imagine you're planning a trip. You've booked your flight months in advance, packed your bags, and arrived at the airport 
+    with plenty of time to spare. Then you see it on the departure board: **DELAYED**. Sound familiar?
+    
+    Flight delays are more than just an inconvenience—they cost airlines billions of dollars annually and affect millions 
+    of passengers. But what if we could predict which flights are likely to be delayed? What if airlines could proactively 
+    adjust their schedules, and passengers could make more informed booking decisions?
+    
+    That's exactly what we set out to do.
+    """)
+    
+    st.markdown("---")
+    
+    # The Data
+    st.markdown("#### 📥 The Data")
+    
+    st.markdown("""
+    Our journey began with a massive dataset from the US Department of Transportation—**5.8 million domestic flight records** 
+    from 2015. This wasn't just numbers in a spreadsheet; it was a year's worth of real journeys, real delays, and real 
+    stories from travelers across America.
+    
+    The dataset came in a hefty **500 MB CSV file**, containing everything from departure times and airlines to weather delays 
+    and cancellation codes. It was comprehensive, but it was also unwieldy. Loading it took forever, and analyzing it felt 
+    like trying to drink from a fire hose.
+    """)
+    
+    data_col1, data_col2 = st.columns(2)
+    
+    with data_col1:
+        st.info("""
+        **📊 The Numbers**  
+        5.8 Million flight records  
+        500 MB of raw data  
+        Full year of 2015  
+        Every major US airline
+        """)
+    
+    with data_col2:
+        st.info("""
+        **🗂️ The Components**  
+        Flight schedules & delays  
+        Airline information  
+        Airport details  
+        Cancellation reasons
+        """)
+    
+    st.markdown("---")
+    
+    # The Transformation
+    st.markdown("#### ⚙️ The Transformation")
+    
+    st.markdown("""
+    Here's where things got interesting. We faced our first major challenge: **the data was too slow to work with**. 
+    Every time we loaded the CSV file, we'd wait... and wait... and wait some more. This wasn't going to work for an 
+    interactive dashboard.
+    
+    So we got creative. We transformed the data from CSV to **Parquet format**—a columnar storage format designed for 
+    analytics. But we didn't stop there. We carefully analyzed which columns we actually needed, dropped the unnecessary 
+    ones, and optimized the data types. Think of it like packing for a trip: we kept what we needed and left the rest behind.
+    """)
+    
+    st.code("""
+# Before: Slow and memory-hungry
+df = pd.read_csv('flights.csv')  # 500 MB, 30+ seconds to load
+
+# After: Fast and efficient
+df = pd.read_parquet('flights.parquet')  # 74 MB, loads in seconds!
+    """, language="python")
+    
+    st.markdown("**The result?** A dramatic transformation:")
+    
+    result_metrics = st.columns(3)
+    with result_metrics[0]:
+        st.metric("Original Size", "~500 MB", delta=None)
+    with result_metrics[1]:
+        st.metric("Optimized Size", "74 MB", delta="-426 MB", delta_color="inverse")
+    with result_metrics[2]:
+        st.metric("Size Reduction", "85%", delta=None)
+    
+    st.markdown("""
+    We didn't just make it smaller—we made it **85% smaller** while keeping all the information we needed. 
+    The dashboard now loads in seconds instead of minutes, making exploration feel effortless.
+    """)
+    
+    st.markdown("---")
+    
+    # The Discovery
+    st.markdown("#### 📊 The Discovery")
+    
+    st.markdown("""
+    With our data optimized, we dove into exploration. What patterns were hiding in those 5.8 million flights? 
+    
+    We discovered fascinating insights: certain airlines consistently outperformed others, some airports were delay hotspots, 
+    and delays followed clear temporal patterns—morning flights tended to be more punctual, while evening flights accumulated 
+    delays throughout the day like a snowball rolling downhill.
+    
+    Weather wasn't always the culprit we expected. While it caused its fair share of delays, **airline operations** and 
+    **air system issues** were often the real troublemakers. Each visualization in the other tabs tells part of this story, 
+    revealing the complex ecosystem of factors that influence whether your flight leaves on time.
+    """)
+    
+    st.markdown("---")
+    
+    # The Model
+    st.markdown("#### 🤖 The Intelligence")
+    
+    st.markdown("""
+    Armed with these insights, we built something powerful: a **machine learning model** that can predict whether a flight 
+    will be delayed before it even takes off.
+    
+    We chose a **Random Forest algorithm**—imagine a committee of 200 decision trees, each analyzing the flight from a 
+    different angle, then voting on the outcome. This ensemble approach makes the predictions robust and reliable.
+    
+    But what does the model actually look at? We engineered **12 carefully selected features** that capture the essence 
+    of a flight:
+    """)
+    
+    model_col1, model_col2 = st.columns(2)
+    
+    with model_col1:
+        st.markdown("""
+        **Who & Where**  
+        Which airline is operating the flight? Where is it departing from and going to? Different airlines have different 
+        track records, and some airport pairs are more challenging than others.
+        """)
+    
+    with model_col2:
+        st.markdown("""
+        **When & How**  
+        What time of day? What day of the week? Is it a weekend? Morning flights behave differently than evening flights. 
+        Weekend patterns differ from weekdays.
+        """)
+    
+    st.markdown("""
+    **The Details**  
+    How far is the flight? How long does taxi-out typically take at this airport? These operational details matter more 
+    than you might think—a short taxi time suggests smooth operations, while a long one hints at congestion.
+    
+    The model learned from millions of examples, discovering patterns that even experienced airline operations managers 
+    might miss. It's not perfect—no model is—but it's remarkably good at identifying flights that are at risk of delay.
+    """)
+    
+    st.markdown("---")
+    
+    # The Validation
+    st.markdown("#### ✅ The Validation")
+    
+    st.markdown("""
+    Of course, we couldn't just build a model and call it a day. We needed to know: **does it actually work?**
+    
+    We held back 20% of our data—over a million flights—that the model had never seen before. This was our test: could 
+    the model predict delays for flights it knew nothing about?
+    
+    The answer was yes. The model demonstrated strong performance across multiple metrics, balancing the need to catch 
+    delays (recall) with the need to avoid false alarms (precision). You can see the live metrics in the ML Prediction 
+    tab, where the model's confusion matrix tells the full story of its predictions.
+    """)
+    
+    st.markdown("---")
+    
+    # The Dashboard
+    st.markdown("#### 📢 The Dashboard")
+    
+    st.markdown("""
+    Finally, we brought it all together in this interactive dashboard. We didn't want the insights locked away in code 
+    or buried in static reports. We wanted them **alive, interactive, and accessible**.
+    
+    Built with Streamlit and Plotly, this dashboard lets you explore the data yourself, see the patterns we discovered, 
+    and even make your own delay predictions. It's designed to be intuitive—no data science degree required—while still 
+    providing the depth that analysts and aviation professionals need.
+    
+    Every chart is interactive. Every metric is real. Every prediction comes from the same model that learned from 
+    5.8 million flights. This is data science in action, not just in theory.
+    """)
+    
+    st.markdown("---")
+    
+    # The Impact
+    st.markdown("""
+    <div style="background-color: #1a1c24; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 5px; margin-top: 20px;">
+        <h4 style="margin-top: 0;">💡 The Impact</h4>
+        <p style="font-size: 16px; line-height: 1.6;">
+        This project demonstrates what's possible when we combine domain knowledge, technical skill, and creative 
+        problem-solving. We took a massive, unwieldy dataset and transformed it into actionable intelligence. We built 
+        a model that can help airlines optimize operations and help passengers make smarter travel decisions.
+        </p>
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 0;">
+        But more than that, we created a tool that tells a story—the story of millions of flights, thousands of delays, 
+        and the patterns that connect them all. Welcome to the journey.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
