@@ -125,7 +125,6 @@ with st.spinner('Loading Application Data...'):
     
     if metrics is not None:
         # Using precomputed metrics - load minimal reference data only
-        st.success("✅ Using precomputed metrics (cloud-optimized mode)")
         # Load just airline/airport reference data for ML tab
         flights, airlines, airports = load_data(minimal=True)
     else:
@@ -167,17 +166,7 @@ AIRLINE_COLORS = [
     '#14b8a6', '#f43f5e', '#22d3ee', '#a855f7'
 ]
 
-# --- Sidebar Memory Monitoring ---
-with st.sidebar:
-    st.markdown("### 📊 System Info")
-    memory_mb_current = round(process.memory_info().rss / 1024 / 1024, 1)
-    st.metric("RAM Usage", f"{memory_mb_current} MB")
-    
-    # Show mode indicator
-    if metrics.get('_precomputed', False):
-        st.success("✅ Precomputed Mode")
-    else:
-        st.info("🔧 Development Mode")
+
 
 # --- Main Dashboard Structure ---
 st.title("Airline Performance Dashboard")
