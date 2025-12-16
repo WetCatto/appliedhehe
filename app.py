@@ -124,10 +124,33 @@ if flights is None or flights.empty:
 # OPTIMIZATION: Lazy metric computation - metrics are computed only when tabs are accessed
 # This reduces initial memory usage by ~40%
 
-# --- Global Maps ---
-month_map_rev = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun',
-                 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
-day_map = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
+# =========================================================
+# CONSTANTS
+# =========================================================
+
+# Time mappings
+MONTH_MAP = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun',
+             7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+DAY_MAP = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
+
+# Delay threshold (minutes)
+DELAY_THRESHOLD_MINUTES = 15
+
+# Color palette for consistency
+COLOR_PALETTE = {
+    'on_time': '#22c55e',    # Green
+    'delayed': '#facc15',    # Yellow
+    'cancelled': '#ef4444',  # Red
+    'primary': '#3b82f6',    # Blue
+    'gauge': '#f97316',      # Orange
+}
+
+# Airline colors for charts (14 distinct colors)
+AIRLINE_COLORS = [
+    '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+    '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+    '#14b8a6', '#f43f5e', '#22d3ee', '#a855f7'
+]
 
 # --- Main Dashboard Structure ---
 st.title("Airline Performance Dashboard")
@@ -226,134 +249,17 @@ def render_airline_metric_card(count, pct):
     </div>
     """, unsafe_allow_html=True)
 
-# --- Custom CSS ---
-st.markdown("""
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-        .main {
-            background-color: #0e1117;
-            color: #ffffff;
-        }
-        div[data-testid="stMetricValue"] {
-            font-size: 20px;
-        }
-        /* KPI Cards */
-        .kpi-card-dark {
-            background-color: #4b5563; /* Grey */
-            color: white;
-            padding: 15px;
-            text-align: center;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .kpi-card-grey {
-            background-color: #6b7280; /* Lighter Grey */
-            color: white;
-            padding: 15px;
-            text-align: center;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .kpi-card-darker-grey {
-            background-color: #374151; /* Darker Grey */
-            color: white;
-            padding: 15px;
-            text-align: center;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .kpi-card-green {
-            background-color: #22c55e; /* Green */
-            color: black;
-            padding: 15px;
-            text-align: center;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .kpi-card-yellow {
-            background-color: #facc15; /* Yellow */
-            color: black;
-            padding: 15px;
-            text-align: center;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .kpi-card-red {
-            background-color: #f87171; /* Red */
-            color: black;
-            padding: 15px;
-            text-align: center;
-            border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        /* Delay Tab Specifics */
-        .metric-card-yellow-light {
-            background-color: #fef08a; /* Light Yellow */
-            color: black;
-            padding: 10px;
-            text-align: center;
-            border-radius: 5px;
-            border: 1px solid #facc15;
-            height: 100%;
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center;
-        }
-         /* Airline Tab Specifics */
-        .metric-card-yellow-bold {
-             background-color: #fef9c3;
-             color: black;
-             border: 2px solid #fde047;
-             padding: 15px;
-             text-align: center;
-             border-radius: 8px;
-             height: 100%;
-             display: flex; 
-             flex-direction: column; 
-             justify-content: center; 
-             align-items: center;
-        }
-        
-        .kpi-value {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0;
-        }
-        .kpi-label {
-            font-size: 14px;
-            margin: 0;
-            opacity: 0.9;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+
 
 # --- Helper Functions ---
 def fmt_num(num):
+    """Format number with K/M suffix for readability"""
     if num >= 1_000_000:
         return f"{num/1_000_000:.2f}M"
     elif num >= 1_000:
         return f"{num/1_000:.2f}K"
     else:
         return f"{num:.2f}"
-
-month_map_rev = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun',
-                 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
-day_map = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
 
 
 # --- Reusable KPI Header Function ---

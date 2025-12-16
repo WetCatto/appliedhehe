@@ -10,7 +10,7 @@ Usage:
 """
 
 import pandas as pd
-import pickle
+import joblib  # More efficient than pickle for sklearn models
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
@@ -200,8 +200,8 @@ def evaluate_model(model, X_test, y_test):
     return metrics
 
 def save_model(model, feature_names, label_encoders, metrics):
-    """Save model and associated data to disk."""
-    print("\nSaving model to disk...")
+    """Save model and associated data to disk with compression."""
+    print("\nSaving model to disk with compression...")
     
     model_data = {
         'model': model,
@@ -210,8 +210,9 @@ def save_model(model, feature_names, label_encoders, metrics):
         'metrics': metrics
     }
     
-    with open('flight_delay_model.pkl', 'wb') as f:
-        pickle.dump(model_data, f)
+    # Use joblib with maximum compression for much smaller file size
+    # compress=9 provides maximum compression (similar to gzip -9)
+    joblib.dump(model_data, 'flight_delay_model.pkl', compress=9)
     
     file_size = os.path.getsize('flight_delay_model.pkl') / (1024 * 1024)
     print(f"Model saved to 'flight_delay_model.pkl' ({file_size:.2f} MB)")
