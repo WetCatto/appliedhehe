@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 import os
 
-@st.cache_data
+@st.cache_data(ttl=3600, max_entries=1)
 def load_data():
     """
     Loads and merges the flights, airlines, and airports data.
@@ -97,9 +97,16 @@ def compute_metrics(flights):
     
     # ===== SUMMARY METRICS =====
     metrics['total_flights'] = len(flights)
-    metrics['on_time_flights'] = len(flights[flights['ARRIVAL_DELAY'] <= 15])
-    metrics['delayed_flights'] = len(flights[flights['ARRIVAL_DELAY'] > 15])
-    metrics['cancelled_flights'] = len(flights[flights['CANCELLED'] == 1])
+    
+    # helper columns for vectorized aggregation (much faster & less memory than applying per group)
+    # Use 1/0 integers for counting
+    flights['is_on_time'] = ((flights['ARRIVAL_DELAY'] <= 15) & (flights['CANCELLED'] == 0)).fillna(False).astype(int)
+    flights['is_delayed'] = (flights['ARRIVAL_DELAY'] > 15).fillna(False).astype(int)
+    # flights['CANCELLED'] is already int
+    
+    metrics['on_time_flights'] = flights['is_on_time'].sum()
+    metrics['delayed_flights'] = flights['is_delayed'].sum()
+    metrics['cancelled_flights'] = flights['CANCELLED'].sum()
     metrics['total_airlines'] = flights['AIRLINE'].nunique()
     metrics['total_airports'] = flights['ORIGIN_AIRPORT'].nunique()
     
@@ -137,33 +144,41 @@ def compute_metrics(flights):
     
     # ===== TIME TAB METRICS =====
     # Month stats
-    month_stats = flights.groupby('MONTH').apply(lambda x: pd.Series({
-        'Total': len(x),
-        'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-        'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-        'Cancelled': x['CANCELLED'].sum()
-    }), include_groups=False).reset_index()
+    # Month stats
+    # OPTIMIZATION: Use vectorized agg instead of apply
+    month_stats = flights.groupby('MONTH', observed=False).agg(
+        Total=('MONTH', 'size'),
+        On_Time=('is_on_time', 'sum'),
+        Delayed=('is_delayed', 'sum'),
+        Cancelled=('CANCELLED', 'sum')
+    ).reset_index()
+    # Rename for compatibility
+    month_stats = month_stats.rename(columns={'On_Time': 'On Time', 'Delayed': 'Delayed', 'Cancelled': 'Cancelled'})
     month_stats['Month Name'] = month_stats['MONTH'].map(month_map_rev)
     metrics['month_stats'] = month_stats
     
     # DOW stats
-    dow_stats = flights.groupby('DAY_OF_WEEK').apply(lambda x: pd.Series({
-        'Total': len(x),
-        'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-        'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-        'Cancelled': x['CANCELLED'].sum()
-    }), include_groups=False).reset_index()
+    # DOW stats
+    dow_stats = flights.groupby('DAY_OF_WEEK', observed=False).agg(
+        Total=('DAY_OF_WEEK', 'size'),
+        On_Time=('is_on_time', 'sum'),
+        Delayed=('is_delayed', 'sum'),
+        Cancelled=('CANCELLED', 'sum')
+    ).reset_index()
+    dow_stats = dow_stats.rename(columns={'On_Time': 'On Time', 'Delayed': 'Delayed', 'Cancelled': 'Cancelled'})
     dow_stats['Day Name'] = dow_stats['DAY_OF_WEEK'].map(day_map)
     dow_stats = dow_stats.sort_values('DAY_OF_WEEK', ascending=True)
     metrics['dow_stats'] = dow_stats
     
     # Day stats (1-31)
-    day_stats = flights.groupby('DAY').apply(lambda x: pd.Series({
-        'Total': len(x),
-        'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-        'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-        'Cancelled': x['CANCELLED'].sum()
-    }), include_groups=False).reset_index()
+    # Day stats (1-31)
+    day_stats = flights.groupby('DAY', observed=False).agg(
+        Total=('DAY', 'size'),
+        On_Time=('is_on_time', 'sum'),
+        Delayed=('is_delayed', 'sum'),
+        Cancelled=('CANCELLED', 'sum')
+    ).reset_index()
+    day_stats = day_stats.rename(columns={'On_Time': 'On Time', 'Delayed': 'Delayed', 'Cancelled': 'Cancelled'})
     metrics['day_stats'] = day_stats
     
     # Delay type by month
@@ -181,12 +196,14 @@ def compute_metrics(flights):
     metrics['avg_aa_delay'] = (flights['AIRLINE_DELAY'].fillna(0) + flights['LATE_AIRCRAFT_DELAY'].fillna(0)).mean()
     
     # Airline counts
-    airline_counts = flights.groupby('AIRLINE_NAME', observed=False).apply(lambda x: pd.Series({
-        'Total': len(x),
-        'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-        'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-        'Cancelled': x['CANCELLED'].sum()
-    }), include_groups=False).reset_index()
+    # Airline counts
+    airline_counts = flights.groupby('AIRLINE_NAME', observed=False).agg(
+        Total=('AIRLINE_NAME', 'size'),
+        On_Time=('is_on_time', 'sum'),
+        Delayed=('is_delayed', 'sum'),
+        Cancelled=('CANCELLED', 'sum')
+    ).reset_index()
+    airline_counts = airline_counts.rename(columns={'On_Time': 'On Time', 'Delayed': 'Delayed', 'Cancelled': 'Cancelled'})
     airline_counts = airline_counts.sort_values('Total', ascending=False)
     airline_counts['On Time %'] = (airline_counts['On Time'] / airline_counts['Total'] * 100).round(2)
     airline_counts['Delayed %'] = (airline_counts['Delayed'] / airline_counts['Total'] * 100).round(2)
@@ -198,12 +215,13 @@ def compute_metrics(flights):
     top_airports_list = flights['ORIGIN_AIRPORT'].value_counts().nlargest(50).index.tolist()
     airport_df_top = flights[flights['ORIGIN_AIRPORT'].isin(top_airports_list)]
     
-    airport_counts = airport_df_top.groupby('ORIGIN_AIRPORT', observed=False).apply(lambda x: pd.Series({
-        'Total': len(x),
-        'On Time': ((x['ARRIVAL_DELAY'] <= 15) & (x['CANCELLED'] == 0)).sum(),
-        'Delayed': (x['ARRIVAL_DELAY'] > 15).sum(),
-        'Cancelled': x['CANCELLED'].sum()
-    }), include_groups=False).reset_index()
+    airport_counts = airport_df_top.groupby('ORIGIN_AIRPORT', observed=False).agg(
+        Total=('ORIGIN_AIRPORT', 'size'),
+        On_Time=('is_on_time', 'sum'),
+        Delayed=('is_delayed', 'sum'),
+        Cancelled=('CANCELLED', 'sum')
+    ).reset_index()
+    airport_counts = airport_counts.rename(columns={'On_Time': 'On Time', 'Delayed': 'Delayed', 'Cancelled': 'Cancelled'})
     airport_counts['On Time %'] = (airport_counts['On Time'] / airport_counts['Total'] * 100).fillna(0)
     airport_counts['Delayed %'] = (airport_counts['Delayed'] / airport_counts['Total'] * 100).fillna(0)
     airport_counts['Cancelled %'] = (airport_counts['Cancelled'] / airport_counts['Total'] * 100).fillna(0)
@@ -425,12 +443,20 @@ def predict_delay_probability(model, target_encoders, airline, origin, destinati
     # Create feature array matching training columns
     # Order: AIRLINE_RISK, ORIGIN_RISK, DEST_RISK, MONTH, DAY_OF_WEEK, DAY,
     #        DEPARTURE_HOUR, TIME_OF_DAY, DISTANCE, DISTANCE_CATEGORY, IS_WEEKEND, TAXI_OUT
-    features = np.array([[
+    # Create DataFrame matching training columns to avoid warnings
+    # Order: AIRLINE_RISK, ORIGIN_RISK, DEST_RISK, MONTH, DAY_OF_WEEK, DAY,
+    #        DEPARTURE_HOUR, TIME_OF_DAY, DISTANCE, DISTANCE_CATEGORY, IS_WEEKEND, TAXI_OUT
+    features = pd.DataFrame([[
         airline_risk, origin_risk, dest_risk,
         month, day_of_week, day,
         departure_hour, time_of_day, distance, distance_category,
         is_weekend, taxi_out
-    ]])
+    ]], columns=[
+        'AIRLINE_RISK', 'ORIGIN_RISK', 'DEST_RISK',
+        'MONTH', 'DAY_OF_WEEK', 'DAY',
+        'DEPARTURE_HOUR', 'TIME_OF_DAY', 'DISTANCE', 'DISTANCE_CATEGORY',
+        'IS_WEEKEND', 'TAXI_OUT'
+    ])
     
     # Predict probability
     prob = model.predict_proba(features)[0][1] 
@@ -449,7 +475,7 @@ def load_trained_model_v2():
     import pickle
     import os
     
-    model_path = 'flight_delay_model.pkl'
+    model_path = os.path.join(os.path.dirname(__file__), 'flight_delay_model.pkl')
     
     # Print to logs to verify loading (and bust cache)
     print("Loading optimized flight delay model...")

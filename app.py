@@ -70,8 +70,6 @@ st.markdown("""
         font-weight: 600;
         letter-spacing: -0.025em;
     }
-        border-bottom: 1px solid #2d2f3b;
-    }
     .stTabs [data-baseweb="tab"] {
         background-color: transparent;
         color: #9ca3af;
@@ -133,6 +131,7 @@ day_map = {1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 7:'Sun'}
 
 # --- Main Dashboard Structure ---
 st.title("Airline Performance Dashboard")
+
 # --- Helper Functions ---
 
 # Helper to transparentize charts and apply Maven theme colors
@@ -772,63 +771,66 @@ with tab_ml:
     st.markdown("#### :material/target: Interactive Prediction")
     st.markdown("Enter flight details to predict delay probability:")
     
-    pred_col1, pred_col2, pred_col3 = st.columns(3)
-    
-    # Get unique values for dropdowns
-    # Create airline options with full names
-    airline_codes = sorted(flights['AIRLINE'].dropna().unique())
-    airline_options = []
-    airline_code_map = {}  # Map display name to code
-    
-    for code in airline_codes:
-        airline_info = airlines[airlines['IATA_CODE'] == code]
-        if not airline_info.empty:
-            airline_name = airline_info.iloc[0]['AIRLINE']
-            display_name = f"{code} - {airline_name}"
-        else:
-            display_name = code
-        airline_options.append(display_name)
-        airline_code_map[display_name] = code
-    
-    # Create airport options with full names
-    airport_codes = sorted(flights['ORIGIN_AIRPORT'].dropna().unique())
-    airport_options = []
-    airport_code_map = {}  # Map display name to code
-    
-    for code in airport_codes:
-        airport_info = airports[airports['IATA_CODE'] == code]
-        if not airport_info.empty:
-            airport_name = airport_info.iloc[0]['AIRPORT']
-            city = airport_info.iloc[0]['CITY']
-            display_name = f"{code} - {airport_name}, {city}"
-        else:
-            display_name = code
-        airport_options.append(display_name)
-        airport_code_map[display_name] = code
-    
-    with pred_col1:
-        input_airline_display = st.selectbox("Airline", airline_options, key='ml_airline')
-        input_origin_display = st.selectbox("Origin Airport", airport_options, key='ml_origin')
-        input_dest_display = st.selectbox("Destination Airport", airport_options, key='ml_dest')
+    with st.form("prediction_form"):
+        pred_col1, pred_col2, pred_col3 = st.columns(3)
         
-        # Get actual codes from display names
-        input_airline = airline_code_map[input_airline_display]
-        input_origin = airport_code_map[input_origin_display]
-        input_dest = airport_code_map[input_dest_display]
-    
-    with pred_col2:
-        input_month = st.slider("Month", 1, 12, 6, key='ml_month')
-        input_dow = st.slider("Day of Week (1=Mon, 7=Sun)", 1, 7, 3, key='ml_dow')
-        input_day = st.slider("Day of Month", 1, 31, 15, key='ml_day')
-    
-    with pred_col3:
-        input_sched_dep = st.number_input("Scheduled Departure (24hr format, e.g., 1430)", 
-                                          min_value=0, max_value=2359, value=1200, key='ml_sched')
-        input_distance = st.number_input("Distance (miles)", 
-                                         min_value=0, max_value=5000, value=800, key='ml_dist')
-        input_taxi_out = st.slider("Expected Taxi Out Time (min)", 1, 60, 10, key='ml_taxi')
-    
-    if st.button("Predict Delay Probability", type="primary"):
+        # Get unique values for dropdowns
+        # Create airline options with full names
+        airline_codes = sorted(flights['AIRLINE'].dropna().unique())
+        airline_options = []
+        airline_code_map = {}  # Map display name to code
+        
+        for code in airline_codes:
+            airline_info = airlines[airlines['IATA_CODE'] == code]
+            if not airline_info.empty:
+                airline_name = airline_info.iloc[0]['AIRLINE']
+                display_name = f"{code} - {airline_name}"
+            else:
+                display_name = code
+            airline_options.append(display_name)
+            airline_code_map[display_name] = code
+        
+        # Create airport options with full names
+        airport_codes = sorted(flights['ORIGIN_AIRPORT'].dropna().unique())
+        airport_options = []
+        airport_code_map = {}  # Map display name to code
+        
+        for code in airport_codes:
+            airport_info = airports[airports['IATA_CODE'] == code]
+            if not airport_info.empty:
+                airport_name = airport_info.iloc[0]['AIRPORT']
+                city = airport_info.iloc[0]['CITY']
+                display_name = f"{code} - {airport_name}, {city}"
+            else:
+                display_name = code
+            airport_options.append(display_name)
+            airport_code_map[display_name] = code
+        
+        with pred_col1:
+            input_airline_display = st.selectbox("Airline", airline_options, key='ml_airline')
+            input_origin_display = st.selectbox("Origin Airport", airport_options, key='ml_origin')
+            input_dest_display = st.selectbox("Destination Airport", airport_options, key='ml_dest')
+            
+            # Get actual codes from display names
+            input_airline = airline_code_map[input_airline_display]
+            input_origin = airport_code_map[input_origin_display]
+            input_dest = airport_code_map[input_dest_display]
+        
+        with pred_col2:
+            input_month = st.slider("Month", 1, 12, 6, key='ml_month')
+            input_dow = st.slider("Day of Week (1=Mon, 7=Sun)", 1, 7, 3, key='ml_dow')
+            input_day = st.slider("Day of Month", 1, 31, 15, key='ml_day')
+        
+        with pred_col3:
+            input_sched_dep = st.number_input("Scheduled Departure (24hr format, e.g., 1430)", 
+                                              min_value=0, max_value=2359, value=1200, key='ml_sched')
+            input_distance = st.number_input("Distance (miles)", 
+                                             min_value=0, max_value=5000, value=800, key='ml_dist')
+            input_taxi_out = st.slider("Expected Taxi Out Time (min)", 1, 60, 10, key='ml_taxi')
+        
+        submitted = st.form_submit_button("Predict Delay Probability", type="primary")
+
+    if submitted:
         prob = predict_delay_probability(
             model, label_encoders, input_airline, input_origin, input_dest,
             input_month, input_dow, input_day, input_sched_dep, input_distance, input_taxi_out
