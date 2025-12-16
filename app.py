@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from utils import load_data, compute_metrics
+from utils import load_precomputed_metrics, load_data, compute_metrics
+import psutil
+import os
 
 # --- Optimized Plotly Configuration ---
 # Disable unnecessary features to reduce CPU/memory overhead
@@ -112,17 +114,30 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Data Loading ---
-# Load data once and pre-compute all metrics
+# --- Memory Monitoring (for debugging) ---
+process = psutil.Process(os.getpid())
+memory_mb = round(process.memory_info().rss / 1024 / 1024, 1)
+
+# --- Data Loading with Precomputed Metrics ---
+# Try to load precomputed metrics first (cloud-friendly approach)
 with st.spinner('Loading Application Data...'):
-    flights, airlines, airports = load_data()
-
-if flights is None or flights.empty:
-    st.error("Could not load data. Please ensure CSV files are present in the directory.")
-    st.stop()
-
-# OPTIMIZATION: Lazy metric computation - metrics are computed only when tabs are accessed
-# This reduces initial memory usage by ~40%
+    metrics = load_precomputed_metrics()
+    
+    if metrics is not None:
+        # Using precomputed metrics - load minimal reference data only
+        st.success("✅ Using precomputed metrics (cloud-optimized mode)")
+        # Load just airline/airport reference data for ML tab
+        flights, airlines, airports = load_data(minimal=True)
+    else:
+        # Development mode - compute metrics on-the-fly
+        st.info("ℹ️ Computing metrics from raw data (local development mode)")
+        flights, airlines, airports = load_data(minimal=False)
+        
+        if flights is None or flights.empty:
+            st.error("Could not load data. Please ensure CSV files are present in the directory.")
+            st.stop()
+        
+        metrics = compute_metrics(flights)
 
 # =========================================================
 # CONSTANTS
@@ -151,6 +166,18 @@ AIRLINE_COLORS = [
     '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
     '#14b8a6', '#f43f5e', '#22d3ee', '#a855f7'
 ]
+
+# --- Sidebar Memory Monitoring ---
+with st.sidebar:
+    st.markdown("### 📊 System Info")
+    memory_mb_current = round(process.memory_info().rss / 1024 / 1024, 1)
+    st.metric("RAM Usage", f"{memory_mb_current} MB")
+    
+    # Show mode indicator
+    if metrics.get('_precomputed', False):
+        st.success("✅ Precomputed Mode")
+    else:
+        st.info("🔧 Development Mode")
 
 # --- Main Dashboard Structure ---
 st.title("Airline Performance Dashboard")
@@ -352,14 +379,7 @@ def render_kpi_header(metrics_dict):
 with tab_delay:
     st.markdown("### :material/schedule: Delay Analysis")
     
-    # Lazy load metrics - only compute when this tab is accessed
-    if 'metrics' not in st.session_state:
-        with st.spinner('Computing metrics...'):
-            from utils import compute_metrics
-            st.session_state.metrics = compute_metrics(flights)
-    
-    metrics = st.session_state.metrics
-    
+    # Metrics already loaded at startup
     render_kpi_header(metrics)
         
     # Use pre-computed delay metrics
@@ -440,14 +460,7 @@ with tab_delay:
 with tab_time:
     st.markdown("### :material/access_time: Time Analysis")
     
-    # Lazy load metrics
-    if 'metrics' not in st.session_state:
-        with st.spinner('Computing metrics...'):
-            from utils import compute_metrics
-            st.session_state.metrics = compute_metrics(flights)
-    
-    metrics = st.session_state.metrics
-    
+    # Metrics already loaded at startup
     render_kpi_header(metrics)
     
     # Use pre-computed time stats
@@ -521,14 +534,7 @@ with tab_time:
 with tab_airline:
     st.markdown("### :material/flight: Airline Analysis")
     
-    # Lazy load metrics
-    if 'metrics' not in st.session_state:
-        with st.spinner('Computing metrics...'):
-            from utils import compute_metrics
-            st.session_state.metrics = compute_metrics(flights)
-    
-    metrics = st.session_state.metrics
-
+    # Metrics already loaded at startup
     # Use pre-computed airline metrics
     aa_delay_count = metrics['aa_delay_count']
     aa_delay_pct = metrics['aa_delay_pct']
@@ -590,14 +596,7 @@ with tab_airline:
 with tab_airport:
     st.markdown("### :material/location_on: Airport Analysis")
     
-    # Lazy load metrics
-    if 'metrics' not in st.session_state:
-        with st.spinner('Computing metrics...'):
-            from utils import compute_metrics
-            st.session_state.metrics = compute_metrics(flights)
-    
-    metrics = st.session_state.metrics
-    
+    # Metrics already loaded at startup
     render_kpi_header(metrics)
     
     # Use pre-computed airport counts
@@ -687,37 +686,33 @@ with tab_ml:
     with st.form("prediction_form"):
         pred_col1, pred_col2, pred_col3 = st.columns(3)
         
-        # Get unique values for dropdowns
-        # Create airline options with full names
-        airline_codes = sorted(flights['AIRLINE'].dropna().unique())
+        # Get unique values for dropdowns from reference data (works in both modes)
+        # Create airline options with full names from airlines reference data
         airline_options = []
         airline_code_map = {}  # Map display name to code
         
-        for code in airline_codes:
-            airline_info = airlines[airlines['IATA_CODE'] == code]
-            if not airline_info.empty:
-                airline_name = airline_info.iloc[0]['AIRLINE']
-                display_name = f"{code} - {airline_name}"
-            else:
-                display_name = code
+        for _, row in airlines.iterrows():
+            code = row['IATA_CODE']
+            airline_name = row['AIRLINE']
+            display_name = f"{code} - {airline_name}"
             airline_options.append(display_name)
             airline_code_map[display_name] = code
         
-        # Create airport options with full names
-        airport_codes = sorted(flights['ORIGIN_AIRPORT'].dropna().unique())
+        airline_options = sorted(airline_options)
+        
+        # Create airport options with full names from airports reference data
         airport_options = []
         airport_code_map = {}  # Map display name to code
         
-        for code in airport_codes:
-            airport_info = airports[airports['IATA_CODE'] == code]
-            if not airport_info.empty:
-                airport_name = airport_info.iloc[0]['AIRPORT']
-                city = airport_info.iloc[0]['CITY']
-                display_name = f"{code} - {airport_name}, {city}"
-            else:
-                display_name = code
+        for _, row in airports.iterrows():
+            code = row['IATA_CODE']
+            airport_name = row['AIRPORT']
+            city = row['CITY']
+            display_name = f"{code} - {airport_name}, {city}"
             airport_options.append(display_name)
             airport_code_map[display_name] = code
+        
+        airport_options = sorted(airport_options)
         
         with pred_col1:
             input_airline_display = st.selectbox("Airline", airline_options, key='ml_airline')

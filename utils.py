@@ -15,14 +15,54 @@ DELAY_THRESHOLD_MINUTES = 15
 # Columns we don't need (drop for memory savings)
 UNUSED_COLUMNS = ['TAIL_NUMBER', 'WHEELS_OFF', 'WHEELS_ON', 'AIR_TIME', 'DIVERTED']
 
+@st.cache_resource
+def load_precomputed_metrics():
+    """
+    Load precomputed metrics from disk if available.
+    This allows Streamlit Cloud to skip heavy computation and use pre-calculated metrics.
+    
+    Returns:
+        dict: Precomputed metrics dictionary, or None if file doesn't exist
+    """
+    import joblib
+    
+    metrics_path = os.path.join(os.path.dirname(__file__), 'precomputed_metrics.pkl')
+    
+    if os.path.exists(metrics_path):
+        try:
+            print(f"Loading precomputed metrics from {metrics_path}")
+            metrics = joblib.load(metrics_path)
+            print(f"✅ Loaded {len(metrics)} precomputed metrics")
+            return metrics
+        except Exception as e:
+            st.warning(f"Could not load precomputed metrics: {e}")
+            return None
+    else:
+        print(f"No precomputed metrics found at {metrics_path}")
+        return None
+
+
 @st.cache_data(ttl=3600, max_entries=1)
-def load_data():
+def load_data(minimal=False):
     """
     Loads and merges the flights, airlines, and airports data.
     Optimizes memory usage by specifying data types.
+    
+    Args:
+        minimal (bool): If True, only load airlines and airports reference data.
+                       If False, load full flights dataset.
     """
     try:
-        # Load flights data
+        # Always load reference data
+        airlines = pd.read_csv('airlines.csv')
+        airports = pd.read_csv('airports.csv')
+        
+        # If minimal mode, skip flights data (used when precomputed metrics exist)
+        if minimal:
+            print("Loading in minimal mode (reference data only)")
+            return None, airlines, airports
+        
+        # Load flights data (full mode)
         dtypes = {
             'YEAR': 'int16',
             'MONTH': 'int8',
@@ -62,14 +102,10 @@ def load_data():
         elif os.path.exists('flights.csv'):
             flights = pd.read_csv('flights.csv', dtype=dtypes, low_memory=False)
         else:
-            return None, None, None
+            return None, airlines, airports
 
         # MEMORY OPTIMIZATION: Drop unused columns early
         flights = flights.drop(columns=[col for col in UNUSED_COLUMNS if col in flights.columns], errors='ignore')
-        
-        # Load reference data
-        airlines = pd.read_csv('airlines.csv')
-        airports = pd.read_csv('airports.csv')
         
         # Create a dictionary for fast lookups
         airline_dict = pd.Series(airlines.AIRLINE.values, index=airlines.IATA_CODE).to_dict()
