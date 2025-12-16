@@ -6,3 +6,4 @@ __pycache__/
 !flight_delay_model.pkl
 .DS_Store
 *.log
+!precomputed_metrics.pkl    
