@@ -26,7 +26,7 @@ def load_precomputed_metrics():
     """
     import joblib
     
-    metrics_path = os.path.join(os.path.dirname(__file__), 'precomputed_metrics.pkl')
+    metrics_path = os.path.join(os.path.dirname(__file__), 'data/processed/precomputed_metrics.pkl')
     
     if os.path.exists(metrics_path):
         try:
@@ -54,8 +54,8 @@ def load_data(minimal=False):
     """
     try:
         # Always load reference data
-        airlines = pd.read_csv('airlines.csv')
-        airports = pd.read_csv('airports.csv')
+        airlines = pd.read_csv('data/raw/airlines.csv')
+        airports = pd.read_csv('data/raw/airports.csv')
         
         # If minimal mode, skip flights data (used when precomputed metrics exist)
         if minimal:
@@ -97,8 +97,8 @@ def load_data(minimal=False):
         }
         
         # Check if files exist to avoid hard crashes
-        if os.path.exists('flights.parquet'):
-            flights = pd.read_parquet('flights.parquet')
+        if os.path.exists('data/processed/flights.parquet'):
+            flights = pd.read_parquet('data/processed/flights.parquet')
         elif os.path.exists('flights.csv'):
             flights = pd.read_csv('flights.csv', dtype=dtypes, low_memory=False)
         else:
@@ -531,7 +531,7 @@ def load_trained_model_v2():
     import joblib
     import os
     
-    model_path = os.path.join(os.path.dirname(__file__), 'flight_delay_model.pkl')
+    model_path = os.path.join(os.path.dirname(__file__), 'models/flight_delay_model.pkl')
     
     # Print to logs to verify loading (and bust cache)
     print("Loading optimized flight delay model...")

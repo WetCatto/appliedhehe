@@ -45,10 +45,11 @@ try:
     print("Optimized types.")
 
     # Try gzip for better compression to hit < 100MB
-    df.to_parquet('flights.parquet', compression='gzip', index=False)
+    df.to_parquet('data/processed/flights.parquet', compression='gzip', index=False)
     
     csv_size = os.path.getsize('flights.csv') / (1024*1024)
-    pq_size = os.path.getsize('flights.parquet') / (1024*1024)
+    # Display file sizes
+    pq_size = os.path.getsize('data/processed/flights.parquet') / (1024*1024)
     
     print("Conversion Successful.")
     print(f"Original: {csv_size:.2f} MB")

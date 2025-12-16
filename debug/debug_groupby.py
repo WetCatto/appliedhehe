@@ -1,7 +1,7 @@
 import pandas as pd
 try:
     print("Loading parquet...")
-    df = pd.read_parquet('flights.parquet', columns=['DAY_OF_WEEK'])
+    df = pd.read_parquet('data/processed/flights.parquet', columns=['DAY_OF_WEEK'])
     print("Loaded.")
     print("Dtype:", df['DAY_OF_WEEK'].dtype)
     

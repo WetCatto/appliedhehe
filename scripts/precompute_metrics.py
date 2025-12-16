@@ -39,7 +39,7 @@ def main():
     
     if flights is None or flights.empty:
         print("❌ Error: Could not load flights data")
-        print("Make sure flights.csv or flights.parquet exists in the current directory")
+        print("Make sure data/processed/flights.parquet exists in the current directory")
         sys.exit(1)
     
     print(f"✅ Loaded {len(flights):,} flight records")
@@ -70,7 +70,7 @@ def main():
     print()
     
     # Save to disk
-    output_file = 'precomputed_metrics.pkl'
+    output_file = 'data/processed/precomputed_metrics.pkl'
     print(f"💾 Saving metrics to {output_file}...")
     
     try:
@@ -91,7 +91,7 @@ def main():
         print("=" * 60)
         print()
         print("Next steps:")
-        print("  1. Commit precomputed_metrics.pkl to your repository:")
+        print("  1. Commit data/processed/precomputed_metrics.pkl to your repository:")
         print(f"     git add {output_file}")
         print(f"     git commit -m 'Add precomputed metrics for cloud deployment'")
         print()

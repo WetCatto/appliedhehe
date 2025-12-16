@@ -21,12 +21,12 @@ def load_flight_data():
     """Load and prepare flight data."""
     print("Loading flight data...")
     
-    if os.path.exists('flights.parquet'):
-        flights = pd.read_parquet('flights.parquet')
+    if os.path.exists('data/processed/flights.parquet'):
+        flights = pd.read_parquet('data/processed/flights.parquet')
     elif os.path.exists('flights.csv'):
         flights = pd.read_csv('flights.csv', low_memory=False)
     else:
-        raise FileNotFoundError("No flight data file found (flights.parquet or flights.csv)")
+        raise FileNotFoundError("No flight data file found (data/processed/flights.parquet or flights.csv)")
     
     print(f"Loaded {len(flights):,} flight records")
     return flights
@@ -212,10 +212,10 @@ def save_model(model, feature_names, label_encoders, metrics):
     
     # Use joblib with maximum compression for much smaller file size
     # compress=9 provides maximum compression (similar to gzip -9)
-    joblib.dump(model_data, 'flight_delay_model.pkl', compress=9)
+    joblib.dump(model_data, 'models/flight_delay_model.pkl', compress=9)
     
-    file_size = os.path.getsize('flight_delay_model.pkl') / (1024 * 1024)
-    print(f"Model saved to 'flight_delay_model.pkl' ({file_size:.2f} MB)")
+    file_size = os.path.getsize('models/flight_delay_model.pkl') / (1024 * 1024)
+    print(f"Model saved to 'models/flight_delay_model.pkl' ({file_size:.2f} MB)")
 
 def main():
     """Main training pipeline."""
