@@ -202,11 +202,18 @@ def create_gauge_chart(value, title, max_val=None, color="#f97316", unit="min"):
     )
     return fig
 
-# Tabs Reorganization:
+# Initialize tab index in session state
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = 0
+
+# Tabs with controlled index
 tab_delay, tab_time, tab_airline, tab_airport, tab_ml, tab_about = st.tabs([
-    ":material/schedule: Delay Analysis", ":material/access_time: Time Analysis", 
-    ":material/flight: Airline Analysis", ":material/location_on: Airport Analysis", 
-    ":material/psychology: ML Prediction", ":material/info: About"
+    ":material/schedule: Delay Analysis", 
+    ":material/access_time: Time Analysis", 
+    ":material/flight: Airline Analysis", 
+    ":material/location_on: Airport Analysis", 
+    ":material/psychology: ML Prediction", 
+    ":material/info: About"
 ])
 
 def render_airline_metric_card(count, pct):
