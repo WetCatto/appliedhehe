@@ -852,177 +852,236 @@ with tab_ml:
 
 # --- Tab: About ---
 with tab_about:
-    st.markdown("### Project Documentation")
+    # SVG Icons
+    svg_plane = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>'
+    svg_gear = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+    svg_brain = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>'
+    svg_tools = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'
+    svg_check = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+
+    # Header Section
+    st.markdown(f"""
+    <div style="text-align: center; padding: 20px 0;">
+        <div style="display: flex; justify-content: center;">{svg_plane}</div>
+        <h2 style="margin: 10px 0 5px 0; font-weight: 600;">Dataset Information</h2>
+        <p style="color: #94a3b8; margin: 0; font-size: 14px;">Source & Specifications</p>
+    </div>
+    """, unsafe_allow_html=True)
     
+    # Info Banner (dark mode friendly)
     st.markdown("""
-    This dashboard provides comprehensive analysis and machine learning predictions for flight delays 
-    using 2015 US domestic flight data.
-    """)
+    <div style="background: linear-gradient(135deg, #1e3a5f 0%, #1e3a8a 100%); border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="background-color: #0ea5e9; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; font-weight: bold;">i</div>
+            <div style="color: #e2e8f0;">
+                <div style="font-weight: 600; font-size: 16px; margin-bottom: 4px; color: #f8fafc;">US Flight Delays Dataset</div>
+                <div style="font-size: 14px;">This dashboard analyzes the <strong style="color: #60a5fa;">2015 Flight Delays Dataset</strong> publicly available on Kaggle.</div>
+                <div style="margin-top: 12px;">
+                    <a href="https://www.kaggle.com/datasets/usdot/flight-delays" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; background-color: #0ea5e9; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: 500; font-size: 13px;">
+                        <span style="font-weight: bold;">k</span> View Dataset on Kaggle
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown("---")
-    
-    # Project Overview
-    st.markdown("#### :material/description: Project Overview")
-    
+    # Stats Cards Row (dark mode)
     st.markdown("""
-    **Objective**: Analyze flight delay patterns and develop predictive models for delay probability
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 30px 0;">
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 28px; font-weight: 700; color: #0ea5e9;">5.8M</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Flights</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 28px; font-weight: 700; color: #f8fafc;">14</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Airlines</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 28px; font-weight: 700; color: #0ea5e9;">322</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Airports</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 28px; font-weight: 700; color: #f59e0b;">2015</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Time Period</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    **Scope**: 
-    - Exploratory data analysis of delay patterns
-    - Performance comparison across airlines and airports
-    - Machine learning model for delay prediction
-    - Interactive visualization dashboard
-    """)
+    # Dataset Features Section
+    st.markdown(f"""
+    <div style="padding: 20px 0;">
+        <h4 style="font-weight: 600; margin-bottom: 16px; color: #f8fafc;">Dataset Features:</h4>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">14 Major Airlines</strong> (United, American, Delta, Southwest, and more)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">5 Delay Categories</strong> (Airline, Weather, Security, Aircraft, Air System)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">322 US Airports</strong> across all states and territories</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Complete flight metrics</strong> (Departure, Arrival, Distance, Taxi Times)</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Dataset Information
-    st.markdown("#### :material/bar_chart: Dataset Specifications")
+    # Technical Implementation Section
+    st.markdown(f"""
+    <div style="text-align: center; padding: 20px 0;">
+        <div style="display: flex; justify-content: center;">{svg_gear}</div>
+        <h2 style="margin: 10px 0 5px 0; font-weight: 600;">Technical Implementation</h2>
+        <p style="color: #94a3b8; margin: 0; font-size: 14px;">Optimization & Performance</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    data_col1, data_col2 = st.columns(2)
-    
-    with data_col1:
-        st.markdown("""
-        **Source & Scale**
-        - Source: [US Department of Transportation via Kaggle](https://www.kaggle.com/datasets/usdot/flight-delays)
-        - Records: 5.8 million flights
-        - Time Period: January to December 2015
-        - Coverage: All major US domestic carriers
-        - Original Format: CSV (500 MB)
-        - Optimized Format: Parquet (74 MB)
-        """)
-    
-    with data_col2:
-        st.markdown("""
-        **Data Components**
-        - Flight schedules and actual times
-        - Delay information by category
-        - Cancellation data and reasons
-        - Airline reference information
-        - Airport operational details
-        """)
-    
-    st.markdown("---")
-    
-    # Technical Implementation
-    st.markdown("#### :material/settings: Technical Implementation")
-    
+    # Performance Stats Cards (dark mode)
     st.markdown("""
-    **Data Optimization**
-    - Converted CSV to Parquet format for 85% size reduction
-    - Implemented column-level compression (gzip)
-    - Optimized data types (Int32, category)
-    - Removed operationally irrelevant columns
-    - Result: Load time reduced from 30+ seconds to under 1 second
-    """)
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0;">
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #ef4444;">500 MB</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Original CSV Size</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #22c55e;">74 MB</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Optimized Parquet</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #3b82f6;">85%</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Size Reduction</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Optimization Features
+    st.markdown(f"""
+    <div style="padding: 20px 0;">
+        <h4 style="font-weight: 600; margin-bottom: 16px; color: #f8fafc;">Optimization Techniques:</h4>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Parquet Format</strong> (Column-level compression with gzip)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Pre-computed Metrics</strong> (Cloud deployment optimized)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Pre-trained ML Model</strong> (Eliminates 1.5GB training spike)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Session State Caching</strong> (Instant reuse across tabs)</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.code("""
-# Performance comparison
-CSV:     500 MB, 30+ second load time
-Parquet: 74 MB,  <1 second load time
-    """, language="text")
+    st.markdown("---")
     
-    result_metrics = st.columns(3)
-    with result_metrics[0]:
-        st.metric("Original Size", "500 MB")
-    with result_metrics[1]:
-        st.metric("Optimized Size", "74 MB", delta="-426 MB", delta_color="inverse")
-    with result_metrics[2]:
-        st.metric("Reduction", "85%")
+    # Machine Learning Model Section
+    st.markdown(f"""
+    <div style="text-align: center; padding: 20px 0;">
+        <div style="display: flex; justify-content: center;">{svg_brain}</div>
+        <h2 style="margin: 10px 0 5px 0; font-weight: 600;">Machine Learning Model</h2>
+        <p style="color: #94a3b8; margin: 0; font-size: 14px;">Random Forest Classifier</p>
+    </div>
+    """, unsafe_allow_html=True)
     
+    # Model Stats (dark mode)
     st.markdown("""
-    **Cloud Deployment Optimization**
-    
-    Streamlit Community Cloud provides 1GB memory limit per app. To deploy the full 5.8M dataset within this constraint:
-    
-    - **Lazy Metric Loading**: Metrics computed only when tabs are accessed (40% memory reduction)
-    - **Pre-trained Model**: ML model trained locally and committed to repository (eliminates 1.5GB training spike)
-    - **Session State Caching**: Computed metrics cached for instant reuse across tabs
-    """)
-    
-    st.markdown("---")
-    
-    # Machine Learning Model
-    st.markdown("#### :material/psychology: Machine Learning Model")
-    
-    model_col1, model_col2 = st.columns(2)
-    
-    with model_col1:
-        st.markdown("""
-        **Algorithm Configuration**
-        - Model: Random Forest Classifier
-        - Architecture: 150 estimators, Max Depth 14
-        - Training Strategy: **Balanced Downsampling** (50% Delayed / 50% On-Time)
-        - Dataset: 250,000 records (sampled from 5.8M)
-        - Class Imbalance: Handled via Undersampling
-        """)
-    
-    with model_col2:
-        st.markdown("""
-        **Feature Engineering**
-        - **Target Encoding**: Implicit Risk Scores for Airline, Origin, & Destination (based on full 5.8M dataset)
-        - Temporal features: Time-of-Day categorization
-        - Distance binning
-        - Weekend impact analysis
-        - Taxi-out correlation
-        """)
-    
-    st.markdown("---")
-    
-    # Technology Stack
-    st.markdown("#### :material/build: Technology Stack")
-    
-    tech_col1, tech_col2, tech_col3 = st.columns(3)
-    
-    with tech_col1:
-        st.markdown("""
-        **Frontend & UI**
-        - Streamlit
-        - Plotly Express
-        - Plotly Graph Objects
-        """)
-    
-    with tech_col2:
-        st.markdown("""
-        **Data Processing**
-        - Pandas
-        - NumPy
-        - Parquet/PyArrow
-        """)
-    
-    with tech_col3:
-        st.markdown("""
-        **Machine Learning**
-        - Scikit-learn
-        - Random Forest
-        - Target Encoding
-        """)
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 20px 0;">
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #3b82f6;">150</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Estimators</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #f8fafc;">14</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Max Depth</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #22c55e;">250K</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Training Records</div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; text-align: center; background: #0f172a;">
+            <div style="font-size: 24px; font-weight: 700; color: #f59e0b;">~66%</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">F1 Score</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Model Features
+    st.markdown(f"""
+    <div style="padding: 20px 0;">
+        <h4 style="font-weight: 600; margin-bottom: 16px; color: #f8fafc;">Feature Engineering:</h4>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Target Encoding</strong> (Risk scores for Airline, Origin, Destination)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Temporal Features</strong> (Time-of-day categorization, Weekend impact)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Balanced Downsampling</strong> (50% Delayed / 50% On-Time)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; color: #e2e8f0;">
+                {svg_check}
+                <span><strong style="color: #3b82f6;">Operational Metrics</strong> (Distance binning, Taxi-out correlation)</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
-    
-    # Key Findings
-    st.markdown("#### :material/search: Key Findings")
-    
+
+    # Technology Stack Section
+    st.markdown(f"""
+    <div style="text-align: center; padding: 20px 0;">
+        <div style="display: flex; justify-content: center;">{svg_tools}</div>
+        <h2 style="margin: 10px 0 5px 0; font-weight: 600;">Technology Stack</h2>
+        <p style="color: #94a3b8; margin: 0; font-size: 14px;">Built With</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Tech Stack Cards (dark mode)
     st.markdown("""
-    **Delay Patterns Identified**
-    - Morning flights show higher on-time performance
-    - Evening flights experience cumulative delays
-    - Significant carrier-to-carrier performance variation
-    - Specific airports identified as delay concentration points
-    - Weather delays represent smaller proportion than operational issues
-    - Taxi-out time correlates strongly with delay probability
-    """)
-    
-    st.markdown("---")
-    
-    # Dashboard Features
-    st.markdown("#### :material/dashboard: Dashboard Features")
-    
-    st.markdown("""
-    **Interactive Capabilities**
-    - Real-time data filtering and exploration
-    - Multiple visualization types (charts, gauges, heatmaps)
-    - Airline and airport performance comparisons
-    - Temporal pattern analysis
-    - ML-powered delay prediction
-    """)
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0;">
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; background: #0f172a;">
+            <div style="font-weight: 600; color: #f8fafc; margin-bottom: 12px; font-size: 16px;">Frontend & UI</div>
+            <div style="display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 14px;">
+                <div>• Streamlit</div>
+                <div>• Plotly Express</div>
+                <div>• Plotly Graph Objects</div>
+            </div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; background: #0f172a;">
+            <div style="font-weight: 600; color: #f8fafc; margin-bottom: 12px; font-size: 16px;">Data Processing</div>
+            <div style="display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 14px;">
+                <div>• Pandas</div>
+                <div>• NumPy</div>
+                <div>• Parquet/PyArrow</div>
+            </div>
+        </div>
+        <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 24px; background: #0f172a;">
+            <div style="font-weight: 600; color: #f8fafc; margin-bottom: 12px; font-size: 16px;">Machine Learning</div>
+            <div style="display: flex; flex-direction: column; gap: 6px; color: #94a3b8; font-size: 14px;">
+                <div>• Scikit-learn</div>
+                <div>• Random Forest</div>
+                <div>• Target Encoding</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
