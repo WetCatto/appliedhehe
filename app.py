@@ -1026,18 +1026,3 @@ Parquet: 74 MB,  <1 second load time
     - Temporal pattern analysis
     - ML-powered delay prediction
     """)
-    
-    st.markdown("---")
-    
-    # Project Summary
-    st.markdown("""
-    <div style="background-color: #1a1c24; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 5px;">
-        <h4 style="margin-top: 0;">Project Summary</h4>
-        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 0;">
-        This project demonstrates end-to-end data science workflow including data engineering, 
-        exploratory analysis, machine learning, and interactive visualization. The system processes 
-        5.8 million flight records to provide actionable insights for airline operations and passenger 
-        decision-making through an accessible web-based interface.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
